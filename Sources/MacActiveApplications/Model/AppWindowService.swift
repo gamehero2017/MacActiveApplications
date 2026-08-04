@@ -21,8 +21,14 @@ struct AppWindowInfo: Identifiable, Equatable {
     }
 }
 
+@MainActor
 enum AppWindowService {
-    private static var savedFramesBeforeMaximize: [Int: CGRect] = [:]
+    private struct FrameKey: Hashable {
+        let pid: pid_t
+        let windowNumber: Int
+    }
+
+    private static var savedFramesBeforeMaximize: [FrameKey: CGRect] = [:]
     private static var windowsCache: (pid: pid_t, at: Date, windows: [AppWindowInfo])?
     private static let windowsCacheTTL: TimeInterval = 0.25
 
@@ -48,6 +54,15 @@ enum AppWindowService {
         } else {
             windowsCache = nil
         }
+    }
+
+    /// 清除已退出进程的最大化还原缓存，避免窗口号复用后误还原。
+    static func pruneSavedFrames(livePIDs: Set<pid_t>) {
+        savedFramesBeforeMaximize = savedFramesBeforeMaximize.filter { livePIDs.contains($0.key.pid) }
+    }
+
+    static func clearSavedFrames(for pid: pid_t) {
+        savedFramesBeforeMaximize = savedFramesBeforeMaximize.filter { $0.key.pid != pid }
     }
 
     static func windows(for pid: pid_t, bypassCache: Bool = false) -> [AppWindowInfo] {
@@ -100,7 +115,10 @@ enum AppWindowService {
     }
 
     static func hasOnscreenWindows(pid: pid_t) -> Bool {
-        layer0Windows(ownerPID: pid, onScreenOnly: true).contains { $0.width >= 40 && $0.height >= 40 }
+        // 略放宽阈值：小工具条也视为「有窗」，避免前台应用点图标却无法 hide。
+        layer0Windows(ownerPID: pid, onScreenOnly: true).contains {
+            ($0.width >= 16 && $0.height >= 16) || !$0.name.isEmpty
+        }
     }
 
     private static func fetchWindows(for pid: pid_t) -> [AppWindowInfo] {
@@ -111,20 +129,12 @@ enum AppWindowService {
         let appElement = AXUIElementCreateApplication(pid)
         var value: AnyObject?
         let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &value)
-        guard result == .success, let windowList = value as? [AXUIElement] else {
-            // Title-only fallback — no fake AX element, so actions stay disabled.
-            return cgByNumber.values
-                .filter { !$0.name.isEmpty }
-                .sorted { $0.number < $1.number }
-                .map {
-                    AppWindowInfo(
-                        id: $0.number,
-                        title: $0.name,
-                        isMinimized: false,
-                        isMaximized: false,
-                        axElement: nil
-                    )
-                }
+
+        // AX 失败，或成功但列表为空（Electron 等）：回退 CG 标题列表。
+        guard result == .success,
+              let windowList = value as? [AXUIElement],
+              !windowList.isEmpty else {
+            return windowsFromCG(cgByNumber)
         }
 
         var windows: [AppWindowInfo] = []
@@ -161,7 +171,24 @@ enum AppWindowService {
         }
 
         var seen = Set<Int>()
-        return windows.filter { seen.insert($0.id).inserted }
+        let axWindows = windows.filter { seen.insert($0.id).inserted }
+        // 过滤 role 后也可能为空，同样回退 CG。
+        return axWindows.isEmpty ? windowsFromCG(cgByNumber) : axWindows
+    }
+
+    private static func windowsFromCG(_ cgByNumber: [Int: CGWindowRecord]) -> [AppWindowInfo] {
+        cgByNumber.values
+            .filter { !$0.name.isEmpty }
+            .sorted { $0.number < $1.number }
+            .map {
+                AppWindowInfo(
+                    id: $0.number,
+                    title: $0.name,
+                    isMinimized: false,
+                    isMaximized: false,
+                    axElement: nil
+                )
+            }
     }
 
     static func focus(window: AppWindowInfo, pid: pid_t) {
@@ -191,15 +218,17 @@ enum AppWindowService {
         deminiaturizeIfNeeded(element)
         raise(element)
 
+        let key = FrameKey(pid: pid, windowNumber: window.id)
+
         guard let current = windowFrame(element) else {
             _ = pressButton(element, attribute: kAXZoomButtonAttribute as String)
             invalidateWindowsCache(for: pid)
             return
         }
 
-        if let saved = savedFramesBeforeMaximize[window.id], isRoughlyMaximized(current) {
+        if let saved = savedFramesBeforeMaximize[key], isRoughlyMaximized(current) {
             setWindowFrame(element, saved)
-            savedFramesBeforeMaximize.removeValue(forKey: window.id)
+            savedFramesBeforeMaximize.removeValue(forKey: key)
             invalidateWindowsCache(for: pid)
             return
         }
@@ -210,7 +239,7 @@ enum AppWindowService {
             return
         }
 
-        savedFramesBeforeMaximize[window.id] = current
+        savedFramesBeforeMaximize[key] = current
         setWindowFrame(element, cocoaRectToAX(screen.visibleFrame))
         invalidateWindowsCache(for: pid)
     }
@@ -221,14 +250,15 @@ enum AppWindowService {
         activateApp(pid: pid)
         deminiaturizeIfNeeded(element)
 
+        let key = FrameKey(pid: pid, windowNumber: window.id)
         if pressButton(element, attribute: kAXCloseButtonAttribute as String) {
-            savedFramesBeforeMaximize.removeValue(forKey: window.id)
+            savedFramesBeforeMaximize.removeValue(forKey: key)
             invalidateWindowsCache(for: pid)
             return
         }
 
         _ = AXUIElementPerformAction(element, kAXCancelAction as CFString)
-        savedFramesBeforeMaximize.removeValue(forKey: window.id)
+        savedFramesBeforeMaximize.removeValue(forKey: key)
         invalidateWindowsCache(for: pid)
     }
 

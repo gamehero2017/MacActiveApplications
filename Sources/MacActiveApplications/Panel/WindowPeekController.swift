@@ -21,8 +21,8 @@ final class WindowPeekController: ObservableObject {
     func show(pid: pid_t, appName: String, anchorScreenRect: NSRect) {
         AppWindowService.ensurePermission(prompt: true)
         let windows = AppWindowService.windows(for: pid)
-        guard windows.count >= 2 else {
-            // Keep icon hover state; only dismiss an existing peek for another app.
+        // 有可见窗口即显示标题栏列表（含单窗口）；无窗口则不弹出。
+        guard !windows.isEmpty else {
             cancelHide()
             peekHovering = false
             if currentPID != nil {
@@ -40,23 +40,17 @@ final class WindowPeekController: ObservableObject {
         present(windows: windows, pid: pid, appName: appName, anchor: anchorScreenRect)
     }
 
-    func scheduleHide() {
-        reconcileHover()
-    }
-
     func cancelHide() {
         hideWorkItem?.cancel()
         hideWorkItem = nil
     }
 
-    func hide(immediate: Bool) {
+    func hide(immediate: Bool = true) {
         cancelHide()
         iconHovering = false
         peekHovering = false
         currentPID = nil
-        if immediate {
-            panel?.orderOut(nil)
-        }
+        panel?.orderOut(nil)
     }
 
     private func setPeekHovering(_ hovering: Bool) {
@@ -84,15 +78,15 @@ final class WindowPeekController: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
             guard let self, self.currentPID == pid else { return }
             let windows = AppWindowService.windows(for: pid, bypassCache: true)
-            if windows.count >= 2 {
+            if windows.isEmpty {
+                self.hide(immediate: true)
+            } else {
                 self.present(
                     windows: windows,
                     pid: pid,
                     appName: self.currentAppName,
                     anchor: self.currentAnchor
                 )
-            } else {
-                self.hide(immediate: true)
             }
         }
     }
@@ -122,9 +116,6 @@ final class WindowPeekController: ObservableObject {
             }
         )
 
-        let hosting = NSHostingView(rootView: content)
-        hosting.focusRingType = .none
-
         let width = TaskbarStyle.peekPanelWidth(
             titles: windows.map { "[\(appName)] \($0.title)" }
         )
@@ -148,12 +139,19 @@ final class WindowPeekController: ObservableObject {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.acceptsMouseMovedEvents = true
-        panel.contentView = hosting
+
+        if let hosting {
+            hosting.rootView = content
+        } else {
+            let hosting = NSHostingView(rootView: content)
+            hosting.focusRingType = .none
+            panel.contentView = hosting
+            self.hosting = hosting
+        }
+
         panel.setFrame(NSRect(x: x, y: y, width: panelWidth, height: panelHeight), display: true)
         panel.orderFrontRegardless()
-
         self.panel = panel
-        self.hosting = hosting
     }
 
     private func makePanel() -> MenuBarPanel {

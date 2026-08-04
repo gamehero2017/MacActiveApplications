@@ -1,24 +1,29 @@
 # Mac Active Applications
 
-macOS 刘海左侧的 Windows 风格任务栏：覆盖菜单栏左侧区域，展示当前运行中的应用，支持切换、恢复最小化/无窗口应用，以及多窗口悬停预览与窗口操作。
+macOS 刘海左侧的 Windows 风格任务栏：覆盖菜单栏左侧区域，展示当前运行中的应用，支持切换、恢复最小化/无窗口应用、窗口悬停操作、右键菜单，以及系统 Apps（原启动板）入口。
 
 ## 功能
 
 - 吸附在刘海**左侧**，高度与菜单栏一致，默认展开
 - 宽度随运行中应用数量自适应（有上限）
-- 点击把手收起 / 展开（无 hover 自动展开）
+- 点击把手收起 / 展开（无 hover 自动展开）；**右键把手 →「退出任务栏」**
+- 图标顺序：访达 → Apps（启动板）→ 其它运行中应用（按名称排序）
 - 单击图标：切换到前台；若已是前台且有可见窗口则隐藏（Windows 任务栏语义）
 - 最小化或关窗未退出时，点击可恢复到前台（Dock 式 reopen）
-- 多窗口应用悬停：弹出标题栏列表（`[应用名] 窗口标题`）
+- **Apps / 启动板**固定入口（访达后）：单击切换开合，与 Dock 行为一致；无右键、无悬停列表
+- 悬停任意有可见窗口的应用：弹出标题栏列表（`[应用名] 窗口标题`，含单窗口）
   - 点击标题聚焦窗口
   - 最小化 / 最大化（可还原）/ 关闭（需辅助功能权限）
+- **右键应用图标**（不含 Apps）：
+  - 通用：显示、隐藏、在访达中显示、退出
+  - 访达额外：新建访达窗口
 - 菜单栏工具形态：不占用 Dock（`LSUIElement` / `.accessory`）
 
 ## 环境要求
 
-- macOS 13+
+- macOS 13+（Apps 入口在 macOS 26+ 对应 `/System/Applications/Apps.app`；旧系统回退 Launchpad.app）
 - Xcode / Swift 5.9+（命令行工具即可）
-- **辅助功能**权限：多窗口列表与窗口按钮操作需要
+- **辅助功能**权限：窗口列表与窗口按钮操作需要
 
 ## 快速运行
 
@@ -34,6 +39,14 @@ open Package.swift
 ```
 
 选择 scheme `MacActiveApplications`，目标 My Mac，Run。
+
+## 如何退出
+
+本工具无 Dock 图标，可用：
+
+- 右键任务栏**把手** → **退出任务栏**
+- 终端 `swift run` 时：`Ctrl + C`
+- 或：`killall MacActiveApplications`
 
 ## 打包 DMG
 
@@ -56,24 +69,28 @@ open Package.swift
 
 ```text
 Sources/MacActiveApplications/
-  AppDelegate.swift              # 入口
-  Geometry/MenuBarGeometry.swift # 刘海吸附与菜单栏几何
+  AppDelegate.swift                 # 入口
+  Geometry/MenuBarGeometry.swift    # 刘海吸附与菜单栏几何
   Model/
-    RunningAppsStore.swift       # 运行中应用列表与激活逻辑
+    RunningAppsStore.swift          # 运行中应用列表、激活与右键动作
     RunningAppItem.swift
-    AppWindowService.swift       # 窗口枚举 / 最小/最大/关闭（Accessibility）
+    AppWindowService.swift          # 窗口枚举 / 最小/最大/关闭（Accessibility）
+    SystemAppsLauncher.swift        # Apps / 启动板切换（CoreDockSendNotification）
+    AppContextMenuBuilder.swift     # 应用图标右键菜单
   Panel/
-    MenuBarPanel.swift           # 任务栏面板
-    WindowPeekController.swift   # 多窗口悬停弹出层
+    MenuBarPanel.swift              # 任务栏面板
+    WindowPeekController.swift      # 悬停标题栏弹出层
   UI/
-    TaskbarView.swift
-    TaskbarStyle.swift           # 尺寸与样式常量
+    TaskbarView.swift               # 图标 / 把手 / 命中与菜单
+    TaskbarStyle.swift              # 尺寸与样式常量
 Resources/
   Info.plist
-  AppIcon.icns                   # 打包用图标
-  AppIcon.icon/                  # Icon Composer 源（可选）
+  AppIcon.icns                      # 打包用图标
+  AppIcon.icon/                     # Icon Composer 源（可选）
 scripts/
-  package-dmg.sh                 # Release 编译 → .app → DMG
+  package-dmg.sh                    # Release 编译 → .app → DMG
+docs/
+  更新说明.md                       # 版本更新说明
 ```
 
 ## 常用配置
@@ -93,7 +110,9 @@ scripts/
 | 能力 | 权限 |
 |------|------|
 | 列出运行中应用、激活 / hide / reopen | 一般不需要特殊权限 |
-| 多窗口标题、最小/最大/关闭 | **辅助功能（Accessibility）** |
+| 窗口标题、最小/最大/关闭 | **辅助功能（Accessibility）** |
+| Apps / 启动板切换 | 经 Dock 私有通知（`CoreDockSendNotification`），一般无需额外权限 |
+| 访达「新建窗口」 | AppleScript 控制访达（系统可能弹出自动化权限提示） |
 
 未授权辅助功能时，任务栏主体仍可用；窗口标题栏按钮会不可用或降级。
 
@@ -102,12 +121,19 @@ scripts/
 - Swift / AppKit / SwiftUI
 - Swift Package Manager（executable）
 - Accessibility (`AXUIElement`) + `NSWorkspace` / Apple Event reopen
+- Dock：`CoreDockSendNotification("com.apple.launchpad.toggle")`
 
 ## 已知限制
 
 - 会遮挡菜单栏左侧部分系统菜单项（产品设计如此）
 - 最大化几何在极端多屏布局下可能需再校准
+- Apps 入口依赖系统 Dock 接口；极端系统版本差异下行为可能需再验证
 - 当前为本地工具打包（ad-hoc 签名）；对外分发建议 Developer ID + 公证
+- 无法通过公开 API 读取其它应用的 Dock 数字角标（红点/角标需另议）
+
+## 相关文档
+
+- [更新说明](docs/更新说明.md)
 
 ## 许可
 

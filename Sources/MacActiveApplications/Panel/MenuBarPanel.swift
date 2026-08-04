@@ -16,6 +16,7 @@ final class MenuBarPanelController: NSObject {
 
     private var screenObserver: NSObjectProtocol?
     private var spaceObserver: NSObjectProtocol?
+    private var boundBarHeight: CGFloat?
 
     init(store: RunningAppsStore, peekController: WindowPeekController) {
         self.store = store
@@ -37,14 +38,16 @@ final class MenuBarPanelController: NSObject {
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = true
 
-        let root = TaskbarRootView(
-            store: store,
-            peekController: peekController,
-            chrome: .constant(.expanded),
-            barHeight: 24,
-            onChromeChange: { _ in }
+        // 先挂占位根视图；super.init 后立刻用真实 Binding 替换。
+        let hosting = NSHostingView(
+            rootView: TaskbarRootView(
+                store: store,
+                peekController: peekController,
+                chrome: .constant(.expanded),
+                barHeight: 24,
+                onChromeChange: { _ in }
+            )
         )
-        let hosting = NSHostingView(rootView: root)
         hosting.autoresizingMask = [.width, .height]
         hosting.focusRingType = .none
 
@@ -58,6 +61,15 @@ final class MenuBarPanelController: NSObject {
         startObserving()
         relayout(animated: false)
         panel.orderFrontRegardless()
+    }
+
+    deinit {
+        if let screenObserver {
+            NotificationCenter.default.removeObserver(screenObserver)
+        }
+        if let spaceObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver)
+        }
     }
 
     func show() {
@@ -103,7 +115,7 @@ final class MenuBarPanelController: NSObject {
         chrome = next
         peekController.hide(immediate: true)
         rebindRoot()
-        relayout(animated: true)
+        relayoutFrame(animated: true)
     }
 
     private func desiredWidth(in slot: MenuBarSlot) -> CGFloat {
@@ -119,7 +131,11 @@ final class MenuBarPanelController: NSObject {
     private func relayout(animated: Bool) {
         guard let slot = MenuBarGeometry.slot() else { return }
         self.slot = slot
-        rebindRoot(barHeight: slot.barHeight)
+        // barHeight 未变时只改 frame，避免重置 SwiftUI hover / scroll 状态。
+        if boundBarHeight != slot.barHeight {
+            boundBarHeight = slot.barHeight
+            rebindRoot(barHeight: slot.barHeight)
+        }
         applyFrame(desiredWidth(in: slot), in: slot, animated: animated)
     }
 
@@ -144,6 +160,7 @@ final class MenuBarPanelController: NSObject {
 
     private func rebindRoot(barHeight: CGFloat? = nil) {
         let height = barHeight ?? slot?.barHeight ?? 24
+        boundBarHeight = height
         hosting.rootView = TaskbarRootView(
             store: store,
             peekController: peekController,
