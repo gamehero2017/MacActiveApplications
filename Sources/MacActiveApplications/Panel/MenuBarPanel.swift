@@ -195,10 +195,41 @@ struct TaskbarRootView: View {
 }
 
 final class MenuBarPanel: NSPanel {
-    override var canBecomeKey: Bool { true }
+    /// 仅弹 `NSMenu` 时临时允许成为 key；平时必须为 false。
+    /// 否则 Apps / 启动板开合后焦点常留在本面板，其它 App 会出现「点得开但无法输入」。
+    var allowsKeyWhenNeeded = false
+
+    override var canBecomeKey: Bool { allowsKeyWhenNeeded }
     override var canBecomeMain: Bool { false }
 
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
         frameRect
+    }
+}
+
+/// 任务栏为 accessory + statusBar 面板：交互后主动让出键盘焦点。
+@MainActor
+enum TaskbarFocus {
+    static func resignTaskbarKey() {
+        for window in NSApp.windows {
+            if let panel = window as? MenuBarPanel {
+                panel.allowsKeyWhenNeeded = false
+            }
+            if window.isKeyWindow {
+                window.resignKey()
+            }
+        }
+        if NSApp.isActive {
+            NSApp.deactivate()
+        }
+    }
+
+    /// 弹出菜单前短暂允许 key，结束后立刻让出。
+    static func withTemporaryKey(for window: NSWindow?, perform: () -> Void) {
+        let panel = window as? MenuBarPanel
+        panel?.allowsKeyWhenNeeded = true
+        window?.makeKeyAndOrderFront(nil)
+        perform()
+        resignTaskbarKey()
     }
 }

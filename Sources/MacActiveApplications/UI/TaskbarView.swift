@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import ObjectiveC
 
 enum TaskbarChrome: Equatable {
     case collapsed
@@ -24,6 +23,10 @@ struct TaskbarView: View {
     var body: some View {
         HStack(spacing: 0) {
             if chrome == .expanded {
+                // 汉堡菜单：仅展开时显示；收起后只留把手。
+                SettingsMenuButton(barHeight: barHeight, store: store, peekController: peekController)
+                    .frame(width: TaskbarStyle.settingsButtonWidth)
+
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: TaskbarStyle.iconSpacing) {
                         ForEach(store.apps) { app in
@@ -101,6 +104,44 @@ struct FocuslessButtonStyle: ButtonStyle {
     }
 }
 
+private struct SettingsMenuButton: View {
+    let barHeight: CGFloat
+    @ObservedObject var store: RunningAppsStore
+    @ObservedObject var peekController: WindowPeekController
+    @ObservedObject private var preferences = TaskbarPreferences.shared
+
+    @State private var hovering = false
+
+    var body: some View {
+        ZStack {
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: max(10, barHeight * 0.42), weight: .semibold))
+                .foregroundStyle(Color.white.opacity(hovering ? 1 : 0.85))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(hovering ? Color.white.opacity(0.20) : Color.clear)
+                )
+                .allowsHitTesting(false)
+
+            AppIconHitView(
+                onView: { _ in },
+                onLeftClick: {},
+                onRightClick: { _, _ in },
+                onHover: { hovering = $0 },
+                onLeftClickWithEvent: { view, _ in
+                    peekController.hide(immediate: true)
+                    let menu = TaskbarSettingsMenuBuilder.menu(store: store, preferences: preferences)
+                    TaskbarSettingsMenuBuilder.popUp(menu: menu, from: view)
+                }
+            )
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .help("设置")
+    }
+}
+
 private struct HandleButton: View {
     let chrome: TaskbarChrome
     let barHeight: CGFloat
@@ -117,45 +158,13 @@ private struct HandleButton: View {
             AppIconHitView(
                 onView: { _ in },
                 onLeftClick: action,
-                onRightClick: { view, event in
-                    let menu = NSMenu()
-                    menu.autoenablesItems = false
-                    let item = NSMenuItem(
-                        title: "退出任务栏",
-                        action: #selector(HandleQuitTarget.quit(_:)),
-                        keyEquivalent: ""
-                    )
-                    let target = HandleQuitTarget()
-                    item.target = target
-                    objc_setAssociatedObject(
-                        item,
-                        &HandleQuitAssociatedKeys.target,
-                        target,
-                        .OBJC_ASSOCIATION_RETAIN_NONATOMIC
-                    )
-                    menu.addItem(item)
-
-                    let location = view.convert(event.locationInWindow, from: nil)
-                    let point = NSPoint(x: location.x, y: location.y - 2)
-                    view.window?.makeKeyAndOrderFront(nil)
-                    menu.popUp(positioning: nil, at: point, in: view)
-                },
+                onRightClick: { _, _ in },
                 onHover: { _ in }
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
         .help(chrome == .collapsed ? "展开任务栏" : "收起任务栏")
-    }
-}
-
-private enum HandleQuitAssociatedKeys {
-    static var target: UInt8 = 0
-}
-
-private final class HandleQuitTarget: NSObject {
-    @objc func quit(_ sender: Any?) {
-        NSApp.terminate(nil)
     }
 }
 
@@ -240,13 +249,12 @@ private struct AppIconButton: View {
     }
 
     private func presentContextMenu(_ menu: NSMenu, from view: NSView, event: NSEvent) {
-        // 非激活面板上 popUpContextMenu 常失败，改用显式坐标弹出。
+        // 非激活面板上 popUpContextMenu 常失败，改用显式坐标弹出；结束后立刻让出 key。
         let location = view.convert(event.locationInWindow, from: nil)
         let point = NSPoint(x: location.x, y: location.y - 2)
-        if let window = view.window {
-            window.makeKeyAndOrderFront(nil)
+        TaskbarFocus.withTemporaryKey(for: view.window) {
+            menu.popUp(positioning: nil, at: point, in: view)
         }
-        menu.popUp(positioning: nil, at: point, in: view)
     }
 }
 
@@ -256,12 +264,14 @@ private struct AppIconHitView: NSViewRepresentable {
     let onLeftClick: () -> Void
     let onRightClick: (NSView, NSEvent) -> Void
     let onHover: (Bool) -> Void
+    var onLeftClickWithEvent: ((NSView, NSEvent) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             onLeftClick: onLeftClick,
             onRightClick: onRightClick,
-            onHover: onHover
+            onHover: onHover,
+            onLeftClickWithEvent: onLeftClickWithEvent
         )
     }
 
@@ -276,6 +286,7 @@ private struct AppIconHitView: NSViewRepresentable {
         context.coordinator.onLeftClick = onLeftClick
         context.coordinator.onRightClick = onRightClick
         context.coordinator.onHover = onHover
+        context.coordinator.onLeftClickWithEvent = onLeftClickWithEvent
         nsView.coordinator = context.coordinator
     }
 
@@ -283,15 +294,18 @@ private struct AppIconHitView: NSViewRepresentable {
         var onLeftClick: () -> Void
         var onRightClick: (NSView, NSEvent) -> Void
         var onHover: (Bool) -> Void
+        var onLeftClickWithEvent: ((NSView, NSEvent) -> Void)?
 
         init(
             onLeftClick: @escaping () -> Void,
             onRightClick: @escaping (NSView, NSEvent) -> Void,
-            onHover: @escaping (Bool) -> Void
+            onHover: @escaping (Bool) -> Void,
+            onLeftClickWithEvent: ((NSView, NSEvent) -> Void)?
         ) {
             self.onLeftClick = onLeftClick
             self.onRightClick = onRightClick
             self.onHover = onHover
+            self.onLeftClickWithEvent = onLeftClickWithEvent
         }
     }
 }
@@ -301,7 +315,8 @@ private final class AppIconHitNSView: NSView {
     private var tracking: NSTrackingArea?
 
     override var isFlipped: Bool { false }
-    override var acceptsFirstResponder: Bool { true }
+    /// 不抢第一响应者，避免任务栏点击后键盘焦点留在空白命中层。
+    override var acceptsFirstResponder: Bool { false }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -319,7 +334,11 @@ private final class AppIconHitNSView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        coordinator?.onLeftClick()
+        if let withEvent = coordinator?.onLeftClickWithEvent {
+            withEvent(self, event)
+        } else {
+            coordinator?.onLeftClick()
+        }
     }
 
     override func rightMouseDown(with event: NSEvent) {

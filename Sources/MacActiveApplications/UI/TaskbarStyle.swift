@@ -3,8 +3,10 @@ import Foundation
 import AppKit
 
 enum TaskbarStyle {
-    static let collapsedWidth: CGFloat = 22
+    static let settingsButtonWidth: CGFloat = 22
     static let handleWidth: CGFloat = 22
+    /// 收起时只留把手。
+    static let collapsedWidth: CGFloat = handleWidth
     static let horizontalPadding: CGFloat = 4
     static let iconSpacing: CGFloat = 2
     /// Keep a little air on the leading edge so the rounded corner doesn't clip system menus.
@@ -41,14 +43,16 @@ enum TaskbarStyle {
     }
 
     /// Ideal width for the given icon count (before applying the slot max).
+    /// 展开：`[汉堡][图标…][把手]`；收起：仅把手。
     static func contentWidth(appCount: Int, barHeight: CGFloat, chrome: Bool) -> CGFloat {
         guard chrome else { return collapsedWidth }
         let icon = iconSize(forBarHeight: barHeight)
         let cell = icon + iconCellPadding
         let iconsWidth = CGFloat(appCount) * cell
             + CGFloat(max(0, appCount - 1)) * iconSpacing
-        // Only leading padding — icons sit flush against the handle on the trailing side.
-        let width = handleWidth
+        // 汉堡与把手之间：仅图标区左侧 padding；图标贴把手。
+        let width = settingsButtonWidth
+            + handleWidth
             + (appCount > 0 ? horizontalPadding + iconsWidth : 0)
         return max(collapsedWidth, width)
     }

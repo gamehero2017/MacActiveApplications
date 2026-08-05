@@ -85,8 +85,8 @@ final class RunningAppsStore: ObservableObject {
                 )
             }
 
-        // Apps / 启动板：固定在访达后面（无访达时置于最左）。
-        if SystemAppsLauncher.appURL != nil {
+        // Apps / 启动板：固定在访达后面（无访达时置于最左）；可由偏好关闭。
+        if TaskbarPreferences.shared.showAppsLauncher, SystemAppsLauncher.appURL != nil {
             let launcher = RunningAppItem(
                 id: SystemAppsLauncher.sentinelPID,
                 bundleIdentifier: "com.apple.apps.launcher",
@@ -114,6 +114,9 @@ final class RunningAppsStore: ObservableObject {
         }
 
         guard let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else { return }
+
+        // 切换普通应用前先让出任务栏 key，保证目标窗口能接收键盘输入。
+        TaskbarFocus.resignTaskbarKey()
 
         if app.isActive, AppWindowService.hasOnscreenWindows(pid: pid) {
             app.hide()

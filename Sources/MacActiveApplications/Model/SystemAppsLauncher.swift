@@ -43,11 +43,45 @@ enum SystemAppsLauncher {
     /// 与 Dock 相同：经 HIServices 的 `CoreDockSendNotification` 切换启动板。
     /// 若符号不可用，再回退到辅助功能点击 Dock 图标。
     static func toggle() {
+        let wasVisible = isVisible()
+        let previousApp = frontmostUserApp()
+
+        // 先让出任务栏 key，避免开合后键盘焦点卡在 accessory 面板上。
+        TaskbarFocus.resignTaskbarKey()
+
         if sendCoreDockNotification("com.apple.launchpad.toggle") {
+            scheduleFocusRecovery(wasVisible: wasVisible, previousApp: previousApp)
             return
         }
         AppWindowService.ensurePermission(prompt: true)
         clickDockAppsItem()
+        scheduleFocusRecovery(wasVisible: wasVisible, previousApp: previousApp)
+    }
+
+    /// 关闭 Apps 后把前台与键盘焦点还给原先的用户应用；打开时只确保本进程不占 key。
+    private static func scheduleFocusRecovery(wasVisible: Bool, previousApp: NSRunningApplication?) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            Task { @MainActor in
+                TaskbarFocus.resignTaskbarKey()
+                guard wasVisible else { return }
+                guard let previousApp, !previousApp.isTerminated else { return }
+                previousApp.activate(options: [.activateIgnoringOtherApps])
+            }
+        }
+    }
+
+    private static func frontmostUserApp() -> NSRunningApplication? {
+        guard let front = NSWorkspace.shared.frontmostApplication else { return nil }
+        let selfPID = ProcessInfo.processInfo.processIdentifier
+        if front.processIdentifier == selfPID { return nil }
+        switch front.bundleIdentifier {
+        case "com.apple.apps.launcher",
+             "com.apple.launchpad.launcher",
+             "com.apple.dock":
+            return nil
+        default:
+            return front
+        }
     }
 
     /// 粗略判断启动板是否正打开（用于底部指示点）。优先看 owner/name，少建 NSRunningApplication。
