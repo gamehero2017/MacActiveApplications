@@ -19,7 +19,7 @@ final class WindowPeekController: ObservableObject {
     }
 
     func show(pid: pid_t, appName: String, anchorScreenRect: NSRect) {
-        AppWindowService.ensurePermission(prompt: true)
+        AppWindowService.ensurePermission(prompt: false)
         let windows = AppWindowService.windows(for: pid)
         // 有可见窗口即显示标题栏列表（含单窗口）；无窗口则不弹出。
         guard !windows.isEmpty else {

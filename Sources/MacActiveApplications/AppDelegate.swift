@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 仅首次未授权时弹一次系统框；拒绝后不再每次启动打扰。
         AppWindowService.ensurePermission(prompt: true)
 
         let store = RunningAppsStore()

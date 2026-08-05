@@ -31,6 +31,7 @@ enum AppWindowService {
     private static var savedFramesBeforeMaximize: [FrameKey: CGRect] = [:]
     private static var windowsCache: (pid: pid_t, at: Date, windows: [AppWindowInfo])?
     private static let windowsCacheTTL: TimeInterval = 0.25
+    private static let accessibilityPromptOfferedKey = "taskbar.accessibilityPromptOffered"
 
     struct CGWindowRecord {
         let number: Int
@@ -40,12 +41,27 @@ enum AppWindowService {
         let ownerPID: pid_t
     }
 
+    /// 检查辅助功能权限。
+    /// - Parameter prompt: 为 true 时，**整个安装生命周期最多弹出一次**系统授权框；
+    ///   用户拒绝后不再自动打扰，可从汉堡菜单「辅助功能」手动打开设置。
     @discardableResult
-    static func ensurePermission(prompt: Bool = true) -> Bool {
+    static func ensurePermission(prompt: Bool = false) -> Bool {
         if AXIsProcessTrusted() { return true }
         guard prompt else { return false }
+
+        let defaults = UserDefaults.standard
+        if defaults.bool(forKey: accessibilityPromptOfferedKey) {
+            return false
+        }
+        defaults.set(true, forKey: accessibilityPromptOfferedKey)
+
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         return AXIsProcessTrustedWithOptions(options)
+    }
+
+    /// 是否已向系统要过授权框（用于设置菜单文案等，可选）。
+    static var hasOfferedAccessibilityPrompt: Bool {
+        UserDefaults.standard.bool(forKey: accessibilityPromptOfferedKey)
     }
 
     static func invalidateWindowsCache(for pid: pid_t? = nil) {
@@ -192,7 +208,7 @@ enum AppWindowService {
     }
 
     static func focus(window: AppWindowInfo, pid: pid_t) {
-        ensurePermission(prompt: true)
+        ensurePermission(prompt: false)
         activateApp(pid: pid)
         guard let element = window.axElement else { return }
         deminiaturizeIfNeeded(element)
@@ -201,7 +217,7 @@ enum AppWindowService {
 
     static func minimize(window: AppWindowInfo, pid: pid_t) {
         guard let element = window.axElement else { return }
-        ensurePermission(prompt: true)
+        ensurePermission(prompt: false)
         activateApp(pid: pid)
         _ = AXUIElementSetAttributeValue(
             element,
@@ -213,7 +229,7 @@ enum AppWindowService {
 
     static func toggleMaximize(window: AppWindowInfo, pid: pid_t) {
         guard let element = window.axElement else { return }
-        ensurePermission(prompt: true)
+        ensurePermission(prompt: false)
         activateApp(pid: pid)
         deminiaturizeIfNeeded(element)
         raise(element)
@@ -246,7 +262,7 @@ enum AppWindowService {
 
     static func close(window: AppWindowInfo, pid: pid_t) {
         guard let element = window.axElement else { return }
-        ensurePermission(prompt: true)
+        ensurePermission(prompt: false)
         activateApp(pid: pid)
         deminiaturizeIfNeeded(element)
 

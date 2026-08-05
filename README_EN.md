@@ -19,9 +19,9 @@ A Windows-style taskbar for macOS, docked to the **left of the notch**. It cover
 - **Right-click app icons** (except Apps):
   - Common: Show, Hide, Reveal in Finder, Quit
   - Finder extra: New Finder Window
-- **Hamburger menu** (leftmost, expanded only):
+- **Hamburger menu** (leftmost, expanded only; icon rotates to an X while open):
   - Version (non-interactive)
-  - Accessibility status (opens System Settings)
+  - Accessibility status (opens System Settings; system prompt at most once)
   - Show Apps (toggle)
   - Show window list on hover (toggle)
   - Remember expanded / collapsed (toggle)
@@ -131,7 +131,7 @@ In `UI/TaskbarStyle.swift`:
 | Apps / Launchpad toggle | Via Dock private notification (`CoreDockSendNotification`); usually no extra permission |
 | Finder “New Window” | AppleScript controlling Finder (system may prompt for Automation) |
 
-Without Accessibility, the taskbar itself still works; window title-bar actions are disabled or degraded.
+Without Accessibility, the taskbar itself still works; window title-bar actions are disabled or degraded. The system Accessibility prompt appears at most once; afterward use the hamburger menu to open Settings.
 
 ## Tech stack
 

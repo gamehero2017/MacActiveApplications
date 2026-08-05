@@ -117,18 +117,24 @@ private struct SettingsMenuButton: View {
     @ObservedObject private var preferences = TaskbarPreferences.shared
 
     @State private var hovering = false
+    /// 菜单打开时三条横线旋转成 X。
+    @State private var menuOpen = false
+
+    private var iconSize: CGFloat { max(10, barHeight * 0.42) }
 
     var body: some View {
         ZStack {
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: max(10, barHeight * 0.42), weight: .semibold))
-                .foregroundStyle(Color.white.opacity(hovering ? 1 : 0.85))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(hovering ? Color.white.opacity(0.20) : Color.clear)
-                )
-                .allowsHitTesting(false)
+            HamburgerToXIcon(
+                isOpen: menuOpen,
+                size: iconSize,
+                color: Color.white.opacity(hovering || menuOpen ? 1 : 0.85)
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(hovering || menuOpen ? Color.white.opacity(0.20) : Color.clear)
+            )
+            .allowsHitTesting(false)
 
             AppIconHitView(
                 onView: { _ in },
@@ -143,13 +149,57 @@ private struct SettingsMenuButton: View {
                         peekController: peekController,
                         chromeExpanded: chrome == .expanded
                     )
-                    TaskbarSettingsMenuBuilder.popUp(menu: menu, from: view)
+                    // 先播旋转，再阻塞式弹出菜单；关闭后转回汉堡。
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                        menuOpen = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                        TaskbarSettingsMenuBuilder.popUp(menu: menu, from: view)
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                            menuOpen = false
+                        }
+                    }
                 }
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
         .help(L10n.settings)
+    }
+}
+
+/// 三条横线 ↔ X（上下两线旋转交叉，中线淡出）。
+private struct HamburgerToXIcon: View {
+    let isOpen: Bool
+    let size: CGFloat
+    let color: Color
+
+    var body: some View {
+        let lineHeight = max(1.5, size * 0.14)
+        let lineWidth = size * 1.15
+        let spacing = size * 0.32
+
+        ZStack {
+            Capsule()
+                .fill(color)
+                .frame(width: lineWidth, height: lineHeight)
+                .offset(y: isOpen ? 0 : -spacing)
+                .rotationEffect(.degrees(isOpen ? 45 : 0))
+
+            Capsule()
+                .fill(color)
+                .frame(width: lineWidth, height: lineHeight)
+                .opacity(isOpen ? 0 : 1)
+                .scaleEffect(x: isOpen ? 0.2 : 1, y: 1, anchor: .center)
+
+            Capsule()
+                .fill(color)
+                .frame(width: lineWidth, height: lineHeight)
+                .offset(y: isOpen ? 0 : spacing)
+                .rotationEffect(.degrees(isOpen ? -45 : 0))
+        }
+        .frame(width: size * 1.2, height: size * 1.2)
+        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: isOpen)
     }
 }
 

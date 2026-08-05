@@ -53,7 +53,7 @@ enum SystemAppsLauncher {
             scheduleFocusRecovery(wasVisible: wasVisible, previousApp: previousApp)
             return
         }
-        AppWindowService.ensurePermission(prompt: true)
+        AppWindowService.ensurePermission(prompt: false)
         clickDockAppsItem()
         scheduleFocusRecovery(wasVisible: wasVisible, previousApp: previousApp)
     }
