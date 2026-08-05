@@ -24,7 +24,12 @@ struct TaskbarView: View {
         HStack(spacing: 0) {
             if chrome == .expanded {
                 // 汉堡菜单：仅展开时显示；收起后只留把手。
-                SettingsMenuButton(barHeight: barHeight, store: store, peekController: peekController)
+                SettingsMenuButton(
+                    barHeight: barHeight,
+                    chrome: chrome,
+                    store: store,
+                    peekController: peekController
+                )
                     .frame(width: TaskbarStyle.settingsButtonWidth)
 
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -106,6 +111,7 @@ struct FocuslessButtonStyle: ButtonStyle {
 
 private struct SettingsMenuButton: View {
     let barHeight: CGFloat
+    let chrome: TaskbarChrome
     @ObservedObject var store: RunningAppsStore
     @ObservedObject var peekController: WindowPeekController
     @ObservedObject private var preferences = TaskbarPreferences.shared
@@ -131,14 +137,19 @@ private struct SettingsMenuButton: View {
                 onHover: { hovering = $0 },
                 onLeftClickWithEvent: { view, _ in
                     peekController.hide(immediate: true)
-                    let menu = TaskbarSettingsMenuBuilder.menu(store: store, preferences: preferences)
+                    let menu = TaskbarSettingsMenuBuilder.menu(
+                        store: store,
+                        preferences: preferences,
+                        peekController: peekController,
+                        chromeExpanded: chrome == .expanded
+                    )
                     TaskbarSettingsMenuBuilder.popUp(menu: menu, from: view)
                 }
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
-        .help("设置")
+        .help(L10n.settings)
     }
 }
 
@@ -164,7 +175,7 @@ private struct HandleButton: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
-        .help(chrome == .collapsed ? "展开任务栏" : "收起任务栏")
+        .help(chrome == .collapsed ? L10n.expandTaskbar : L10n.collapseTaskbar)
     }
 }
 
@@ -173,6 +184,7 @@ private struct AppIconButton: View {
     let size: CGFloat
     @ObservedObject var store: RunningAppsStore
     @ObservedObject var peekController: WindowPeekController
+    @ObservedObject private var preferences = TaskbarPreferences.shared
     let action: () -> Void
 
     @State private var hovering = false
@@ -215,6 +227,14 @@ private struct AppIconButton: View {
                     if app.isAppsLauncher {
                         if !isHovering {
                             peekController.setIconHovering(false)
+                        }
+                        return
+                    }
+                    guard preferences.showWindowPeekOnHover else {
+                        if !isHovering {
+                            peekController.setIconHovering(false)
+                        } else {
+                            peekController.hide(immediate: true)
                         }
                         return
                     }

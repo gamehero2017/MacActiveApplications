@@ -152,7 +152,7 @@ enum AppWindowService {
             } else if let cgTitle, !cgTitle.isEmpty {
                 resolvedTitle = cgTitle
             } else {
-                resolvedTitle = "未命名窗口"
+                resolvedTitle = L10n.untitledWindow
             }
 
             let minimized = boolAttribute(window, kAXMinimizedAttribute as String) ?? false

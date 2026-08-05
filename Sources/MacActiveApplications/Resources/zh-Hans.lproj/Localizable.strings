@@ -1,0 +1,30 @@
+/* Settings menu */
+"menu.version %@" = "版本 %@";
+"menu.accessibility_trusted" = "辅助功能：已授权";
+"menu.accessibility_denied" = "辅助功能：未授权（点击打开设置）";
+"menu.show_apps" = "显示 Apps";
+"menu.show_window_peek" = "悬停显示窗口列表";
+"menu.remember_chrome" = "记住展开/收起状态";
+"menu.launch_at_login" = "开机启动";
+"menu.quit_taskbar" = "退出任务栏";
+
+/* Tooltips */
+"tooltip.settings" = "设置";
+"tooltip.expand" = "展开任务栏";
+"tooltip.collapse" = "收起任务栏";
+
+/* Context menu */
+"context.show" = "显示";
+"context.hide" = "隐藏";
+"context.new_finder_window" = "新建访达窗口";
+"context.reveal_in_finder" = "在访达中显示";
+"context.quit" = "退出";
+
+/* Windows / Peek */
+"window.untitled" = "未命名窗口";
+"peek.windows_of %@" = "%@ 的窗口";
+"peek.needs_accessibility" = "需要辅助功能权限才能操作窗口";
+"peek.minimize" = "最小化";
+"peek.maximize" = "最大化";
+"peek.restore" = "还原";
+"peek.close" = "关闭";

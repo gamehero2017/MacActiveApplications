@@ -23,15 +23,19 @@ macOS 刘海左侧的 Windows 风格任务栏：覆盖菜单栏左侧区域，�
   - 版本信息（不可点）
   - 辅助功能状态（打开系统设置）
   - 显示 Apps（勾选）
+  - 悬停显示窗口列表（勾选）
+  - 记住展开/收起状态（勾选）
   - 开机启动（勾选；需以 `.app` 运行才稳定生效）
   - 退出任务栏
 - 菜单栏工具形态：不占用 Dock（`LSUIElement` / `.accessory`）
+- 界面文案跟随系统语言（简体中文 / English）
 
 ## 环境要求
 
 - macOS 13+（Apps 入口在 macOS 26+ 对应 `/System/Applications/Apps.app`；旧系统回退 Launchpad.app）
 - Xcode / Swift 5.9+（命令行工具即可）
 - **辅助功能**权限：窗口列表与窗口按钮操作需要
+- **界面语言**：跟随系统语言（当前支持简体中文 / English）；不做应用内切换
 
 ## 快速运行
 
@@ -87,6 +91,10 @@ Sources/MacActiveApplications/
     AppContextMenuBuilder.swift     # 应用图标右键菜单
     TaskbarPreferences.swift        # 设置项（UserDefaults / 开机启动）
     TaskbarSettingsMenuBuilder.swift # 汉堡 NSMenu
+  L10n.swift                        # 本地化文案入口（跟随系统语言）
+  Resources/
+    en.lproj/Localizable.strings
+    zh-Hans.lproj/Localizable.strings
   Panel/
     MenuBarPanel.swift              # 任务栏面板
     WindowPeekController.swift      # 悬停标题栏弹出层

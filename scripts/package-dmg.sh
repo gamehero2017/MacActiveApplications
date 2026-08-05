@@ -29,6 +29,15 @@ cp "$BIN_PATH" "$APP_DIR/Contents/MacOS/${APP_NAME}"
 cp "$ROOT/Resources/Info.plist" "$APP_DIR/Contents/Info.plist"
 chmod +x "$APP_DIR/Contents/MacOS/${APP_NAME}"
 
+# SPM 本地化资源包需与可执行文件同目录，供 Bundle.module 加载。
+RESOURCE_BUNDLE="$(dirname "$BIN_PATH")/${APP_NAME}_${APP_NAME}.bundle"
+if [[ -d "$RESOURCE_BUNDLE" ]]; then
+  cp -R "$RESOURCE_BUNDLE" "$APP_DIR/Contents/MacOS/"
+  echo "==> Included localization bundle"
+else
+  echo "warning: localization bundle not found at $RESOURCE_BUNDLE" >&2
+fi
+
 if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
   cp "$ROOT/Resources/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
   echo "==> Included AppIcon.icns"

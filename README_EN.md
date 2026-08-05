@@ -23,15 +23,19 @@ A Windows-style taskbar for macOS, docked to the **left of the notch**. It cover
   - Version (non-interactive)
   - Accessibility status (opens System Settings)
   - Show Apps (toggle)
+  - Show window list on hover (toggle)
+  - Remember expanded / collapsed (toggle)
   - Launch at Login (toggle; works reliably when running as a `.app`)
   - Quit Taskbar
 - Menu-bar utility form: no Dock icon (`LSUIElement` / `.accessory`)
+- UI strings follow the system language (Simplified Chinese / English)
 
 ## Requirements
 
 - macOS 13+ (Apps entry on macOS 26+ uses `/System/Applications/Apps.app`; older systems fall back to Launchpad.app)
 - Xcode / Swift 5.9+ (command-line tools are enough)
 - **Accessibility** permission: required for window lists and window button actions
+- **UI language**: follows the system language (Simplified Chinese / English); no in-app language switch
 
 ## Quick start
 
@@ -85,6 +89,10 @@ Sources/MacActiveApplications/
     AppContextMenuBuilder.swift     # App icon context menu
     TaskbarPreferences.swift        # Settings preferences (UserDefaults / login item)
     TaskbarSettingsMenuBuilder.swift # Hamburger NSMenu
+  L10n.swift                        # Localized strings (follows system language)
+  Resources/
+    en.lproj/Localizable.strings
+    zh-Hans.lproj/Localizable.strings
   Panel/
     MenuBarPanel.swift              # Taskbar panel
     WindowPeekController.swift      # Hover title-list overlay (“Peek”)

@@ -215,7 +215,7 @@ struct WindowPeekListView: View {
             .padding(.bottom, TaskbarStyle.peekShadowPadding)
         }
         .background(PeekHoverTrackingView(onHoverChange: onHoverChange))
-        .accessibilityLabel("\(appName) 的窗口")
+        .accessibilityLabel(L10n.windowsOf(appName))
     }
 }
 
@@ -415,11 +415,11 @@ private struct CaptionButton<Icon: View>: View {
     }
 
     private var helpText: String {
-        guard isEnabled else { return "需要辅助功能权限才能操作窗口" }
+        guard isEnabled else { return L10n.needsAccessibility }
         switch kind {
-        case .minimize: return "最小化"
-        case .maximize: return isMaximized ? "还原" : "最大化"
-        case .close: return "关闭"
+        case .minimize: return L10n.minimize
+        case .maximize: return isMaximized ? L10n.restore : L10n.maximize
+        case .close: return L10n.close
         }
     }
 }

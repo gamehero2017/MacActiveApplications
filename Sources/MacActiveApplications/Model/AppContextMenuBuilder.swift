@@ -13,26 +13,26 @@ enum AppContextMenuBuilder {
         let menu = NSMenu()
         menu.autoenablesItems = false
 
-        addItem(menu, title: "显示") {
+        addItem(menu, title: L10n.show) {
             store.showApp(pid: app.id)
         }
-        addItem(menu, title: "隐藏") {
+        addItem(menu, title: L10n.hide) {
             store.hideApp(pid: app.id)
         }
 
         if app.bundleIdentifier == RunningAppsStore.finderBundleID {
             menu.addItem(.separator())
-            addItem(menu, title: "新建访达窗口") {
+            addItem(menu, title: L10n.newFinderWindow) {
                 store.newFinderWindow()
             }
         }
 
         menu.addItem(.separator())
-        addItem(menu, title: "在访达中显示") {
+        addItem(menu, title: L10n.revealInFinder) {
             store.revealInFinder(pid: app.id)
         }
         menu.addItem(.separator())
-        addItem(menu, title: "退出") {
+        addItem(menu, title: L10n.quit) {
             store.quitApp(pid: app.id)
         }
 

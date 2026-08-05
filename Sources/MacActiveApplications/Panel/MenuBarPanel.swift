@@ -21,6 +21,7 @@ final class MenuBarPanelController: NSObject {
     init(store: RunningAppsStore, peekController: WindowPeekController) {
         self.store = store
         self.peekController = peekController
+        self.chrome = TaskbarPreferences.shared.initialChromeExpanded ? .expanded : .collapsed
 
         let panel = MenuBarPanel(
             contentRect: .zero,
@@ -113,6 +114,7 @@ final class MenuBarPanelController: NSObject {
     private func setChrome(_ next: TaskbarChrome) {
         guard chrome != next else { return }
         chrome = next
+        TaskbarPreferences.shared.saveChromeExpanded(next == .expanded)
         peekController.hide(immediate: true)
         rebindRoot()
         relayoutFrame(animated: true)

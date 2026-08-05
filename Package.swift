@@ -3,10 +3,14 @@ import PackageDescription
 
 let package = Package(
     name: "MacActiveApplications",
+    defaultLocalization: "en",
     platforms: [.macOS(.v13)],
     targets: [
         .executableTarget(
-            name: "MacActiveApplications"
+            name: "MacActiveApplications",
+            resources: [
+                .process("Resources")
+            ]
         )
     ]
 )

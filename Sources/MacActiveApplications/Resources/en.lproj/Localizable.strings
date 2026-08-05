@@ -1,0 +1,30 @@
+/* Settings menu */
+"menu.version %@" = "Version %@";
+"menu.accessibility_trusted" = "Accessibility: Granted";
+"menu.accessibility_denied" = "Accessibility: Not granted (click to open Settings)";
+"menu.show_apps" = "Show Apps";
+"menu.show_window_peek" = "Show window list on hover";
+"menu.remember_chrome" = "Remember expanded / collapsed";
+"menu.launch_at_login" = "Launch at Login";
+"menu.quit_taskbar" = "Quit Taskbar";
+
+/* Tooltips */
+"tooltip.settings" = "Settings";
+"tooltip.expand" = "Expand taskbar";
+"tooltip.collapse" = "Collapse taskbar";
+
+/* Context menu */
+"context.show" = "Show";
+"context.hide" = "Hide";
+"context.new_finder_window" = "New Finder Window";
+"context.reveal_in_finder" = "Reveal in Finder";
+"context.quit" = "Quit";
+
+/* Windows / Peek */
+"window.untitled" = "Untitled Window";
+"peek.windows_of %@" = "Windows of %@";
+"peek.needs_accessibility" = "Accessibility permission is required to control windows";
+"peek.minimize" = "Minimize";
+"peek.maximize" = "Maximize";
+"peek.restore" = "Restore";
+"peek.close" = "Close";

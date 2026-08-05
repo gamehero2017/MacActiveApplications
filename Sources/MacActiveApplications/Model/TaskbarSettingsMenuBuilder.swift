@@ -4,7 +4,12 @@ import ObjectiveC
 /// 最左侧三条横线菜单（向下展开）。
 @MainActor
 enum TaskbarSettingsMenuBuilder {
-    static func menu(store: RunningAppsStore, preferences: TaskbarPreferences) -> NSMenu {
+    static func menu(
+        store: RunningAppsStore,
+        preferences: TaskbarPreferences,
+        peekController: WindowPeekController,
+        chromeExpanded: Bool
+    ) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
 
@@ -25,7 +30,7 @@ enum TaskbarSettingsMenuBuilder {
 
         addToggle(
             menu,
-            title: "显示 Apps",
+            title: L10n.showApps,
             isOn: preferences.showAppsLauncher,
             enabled: SystemAppsLauncher.appURL != nil
         ) {
@@ -33,13 +38,27 @@ enum TaskbarSettingsMenuBuilder {
             store.refresh()
         }
 
-        addToggle(menu, title: "开机启动", isOn: preferences.isLaunchAtLoginEnabled) {
+        addToggle(menu, title: L10n.showWindowPeek, isOn: preferences.showWindowPeekOnHover) {
+            preferences.showWindowPeekOnHover.toggle()
+            if !preferences.showWindowPeekOnHover {
+                peekController.hide(immediate: true)
+            }
+        }
+
+        addToggle(menu, title: L10n.rememberChrome, isOn: preferences.rememberChromeState) {
+            preferences.rememberChromeState.toggle()
+            if preferences.rememberChromeState {
+                preferences.saveChromeExpanded(chromeExpanded)
+            }
+        }
+
+        addToggle(menu, title: L10n.launchAtLogin, isOn: preferences.isLaunchAtLoginEnabled) {
             _ = preferences.setLaunchAtLogin(!preferences.isLaunchAtLoginEnabled)
         }
 
         menu.addItem(.separator())
 
-        addItem(menu, title: "退出任务栏") {
+        addItem(menu, title: L10n.quitTaskbar) {
             NSApp.terminate(nil)
         }
 
