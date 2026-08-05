@@ -33,7 +33,8 @@ final class MenuBarPanelController: NSObject {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.level = .statusBar
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        // stationary：触发角「显示桌面」/ Exposé 时不挪走本面板，否则随后把手动画会错位。
+        panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         panel.isMovable = false
         panel.isMovableByWindowBackground = false
         panel.hidesOnDeactivate = false
@@ -117,7 +118,9 @@ final class MenuBarPanelController: NSObject {
         TaskbarPreferences.shared.saveChromeExpanded(next == .expanded)
         peekController.hide(immediate: true)
         rebindRoot()
-        relayoutFrame(animated: true)
+        // 显示桌面场景下优先瞬时落地，避免 animator 从 Exposé 临时几何插值出错。
+        relayoutFrame(animated: false)
+        panel.orderFrontRegardless()
     }
 
     private func desiredWidth(in slot: MenuBarSlot) -> CGFloat {
@@ -149,14 +152,26 @@ final class MenuBarPanelController: NSObject {
 
     private func applyFrame(_ width: CGFloat, in slot: MenuBarSlot, animated: Bool) {
         let frame = MenuBarGeometry.panelFrame(width: width, in: slot)
+        // 清掉可能被「显示桌面」打断的残留动画，防止目标 frame 与实际不同步。
+        panel.animations = [:]
+
         if animated {
-            NSAnimationContext.runAnimationGroup { context in
+            NSAnimationContext.runAnimationGroup({ context in
                 context.duration = 0.18
                 context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 panel.animator().setFrame(frame, display: true)
-            }
+            }, completionHandler: { [weak self] in
+                Task { @MainActor in
+                    guard let self else { return }
+                    if !self.panel.frame.equalTo(frame) {
+                        self.panel.setFrame(frame, display: true)
+                    }
+                    self.panel.orderFrontRegardless()
+                }
+            })
         } else {
             panel.setFrame(frame, display: true)
+            panel.orderFrontRegardless()
         }
     }
 

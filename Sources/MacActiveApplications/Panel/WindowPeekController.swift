@@ -165,7 +165,7 @@ final class WindowPeekController: ObservableObject {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.level = .statusBar
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         panel.isMovable = false
         panel.hidesOnDeactivate = false
         panel.acceptsMouseMovedEvents = true
