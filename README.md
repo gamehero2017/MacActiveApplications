@@ -69,7 +69,7 @@ open Package.swift
 产物：
 
 - `dist/MacActiveApplications.app`
-- `dist/MacActiveApplications-1.0.0.dmg`
+- `dist/MacActiveApplications-<版本号>.dmg`（版本取自 `Resources/Info.plist` 的 `CFBundleShortVersionString`）
 
 安装：打开 DMG，将 App 拖入「应用程序」。首次使用请在：
 

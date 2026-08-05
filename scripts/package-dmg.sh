@@ -6,12 +6,19 @@ cd "$ROOT"
 
 APP_NAME="MacActiveApplications"
 DISPLAY_NAME="Mac Active Applications"
-VERSION="1.0.0"
+# 与 Resources/Info.plist 的 CFBundleShortVersionString 保持一致，避免 DMG 名仍是旧版。
+VERSION="$(
+  /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ROOT/Resources/Info.plist" 2>/dev/null \
+    || plutil -extract CFBundleShortVersionString raw "$ROOT/Resources/Info.plist" 2>/dev/null \
+    || echo "0.0.0"
+)"
 DIST_DIR="$ROOT/dist"
 APP_DIR="$DIST_DIR/${APP_NAME}.app"
 DMG_PATH="$DIST_DIR/${APP_NAME}-${VERSION}.dmg"
 STAGE_DIR="$DIST_DIR/dmg-stage"
 BIN_PATH=""
+
+echo "==> Version ${VERSION} (from Resources/Info.plist)"
 
 echo "==> Building release binary…"
 swift build -c release

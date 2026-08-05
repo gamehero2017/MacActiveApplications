@@ -69,7 +69,7 @@ This tool has no Dock icon. You can:
 Outputs:
 
 - `dist/MacActiveApplications.app`
-- `dist/MacActiveApplications-1.0.0.dmg`
+- `dist/MacActiveApplications-<version>.dmg` (version from `CFBundleShortVersionString` in `Resources/Info.plist`)
 
 Install: open the DMG and drag the app to Applications. On first launch, enable it under:
 
