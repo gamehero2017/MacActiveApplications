@@ -47,6 +47,7 @@ struct TaskbarView: View {
                         }
                     }
                     .padding(.leading, TaskbarStyle.horizontalPadding)
+                    .padding(.trailing, TaskbarStyle.iconsHandleGap(forBarHeight: barHeight))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }

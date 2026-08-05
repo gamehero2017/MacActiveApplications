@@ -38,22 +38,27 @@ enum TaskbarStyle {
         max(12, height - 6)
     }
 
+    /// 最后一个图标与把手之间的空隙（半个图标宽），减轻贴边 hover 冲突。
+    static func iconsHandleGap(forBarHeight height: CGFloat) -> CGFloat {
+        iconSize(forBarHeight: height) / 2
+    }
+
     static func leadingCornerRadius(forBarHeight height: CGFloat) -> CGFloat {
         min(leadingCornerRadius, height * 0.45)
     }
 
     /// Ideal width for the given icon count (before applying the slot max).
-    /// 展开：`[汉堡][图标…][把手]`；收起：仅把手。
+    /// 展开：`[汉堡][图标…][缝][把手]`；收起：仅把手。
     static func contentWidth(appCount: Int, barHeight: CGFloat, chrome: Bool) -> CGFloat {
         guard chrome else { return collapsedWidth }
         let icon = iconSize(forBarHeight: barHeight)
         let cell = icon + iconCellPadding
         let iconsWidth = CGFloat(appCount) * cell
             + CGFloat(max(0, appCount - 1)) * iconSpacing
-        // 汉堡与把手之间：仅图标区左侧 padding；图标贴把手。
+        // 汉堡与把手之间：左侧 padding + 图标 + 与把手的半图标缝。
         let width = settingsButtonWidth
             + handleWidth
-            + (appCount > 0 ? horizontalPadding + iconsWidth : 0)
+            + (appCount > 0 ? horizontalPadding + iconsWidth + iconsHandleGap(forBarHeight: barHeight) : 0)
         return max(collapsedWidth, width)
     }
 

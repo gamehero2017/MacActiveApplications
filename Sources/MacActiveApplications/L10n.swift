@@ -5,15 +5,19 @@ import Foundation
 /// 说明：SwiftPM 拷贝资源时会把 `zh-Hans.lproj` 变成 `zh-hans.lproj`，
 /// `Bundle.preferredLocalizations` 无法匹配 `zh-Hans-CN`，会错误回退到 `en`。
 /// 因此这里按系统首选语言自行解析 `.lproj`。
+///
+/// 不要使用 `Bundle.module`：SPM 生成的 accessor 只查 `.app` 根目录与编译机 `.build` 路径，
+/// 安装到其它机器的 `/Applications` 后会直接 fatalError。
 enum L10n {
     private static let table = "Localizable"
+    private static let resourceBundleName = "MacActiveApplications_MacActiveApplications"
 
     private static let stringsBundle: Bundle = {
         resolveStringsBundle()
     }()
 
     private static func resolveStringsBundle() -> Bundle {
-        let module = Bundle.module
+        let module = resolveResourceBundle()
         let available = module.localizations.filter { $0 != "Base" }
         let preferred = Locale.preferredLanguages
 
@@ -30,6 +34,38 @@ enum L10n {
             return bundle
         }
         return module
+    }
+
+    /// 在 `.app` 常见布局与 `swift run` 产物旁查找 SPM 资源包。
+    private static func resolveResourceBundle() -> Bundle {
+        let name = "\(resourceBundleName).bundle"
+        let main = Bundle.main.bundleURL
+
+        var candidates: [URL] = [
+            // 与 SPM Bundle.module 一致（.app 根目录）
+            main.appendingPathComponent(name),
+            // 打包脚本原先放在可执行文件旁
+            main.appendingPathComponent("Contents/MacOS/\(name)"),
+            // Apple 惯例
+            main.appendingPathComponent("Contents/Resources/\(name)"),
+        ]
+        if let resources = Bundle.main.resourceURL {
+            candidates.append(resources.appendingPathComponent(name))
+        }
+        // swift run / 未打包：可执行文件同目录
+        if let exeDir = Bundle.main.executableURL?.deletingLastPathComponent() {
+            candidates.append(exeDir.appendingPathComponent(name))
+        }
+
+        for url in candidates {
+            if FileManager.default.fileExists(atPath: url.path),
+               let bundle = Bundle(url: url) {
+                return bundle
+            }
+        }
+
+        // 不崩溃：退回 main（界面可能显示 key，但仍可运行）
+        return Bundle.main
     }
 
     /// 将系统语言（如 `zh-Hans-CN`）匹配到包内 localization（如 `zh-hans`）。

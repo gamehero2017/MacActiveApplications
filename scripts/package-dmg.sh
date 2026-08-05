@@ -36,11 +36,13 @@ cp "$BIN_PATH" "$APP_DIR/Contents/MacOS/${APP_NAME}"
 cp "$ROOT/Resources/Info.plist" "$APP_DIR/Contents/Info.plist"
 chmod +x "$APP_DIR/Contents/MacOS/${APP_NAME}"
 
-# SPM 本地化资源包需与可执行文件同目录，供 Bundle.module 加载。
+# SPM 资源包放在 Contents 内（根目录会破坏 codesign：unsealed contents）。
+# L10n 会自行在 MacOS / Resources 下查找，不再依赖 Bundle.module。
 RESOURCE_BUNDLE="$(dirname "$BIN_PATH")/${APP_NAME}_${APP_NAME}.bundle"
 if [[ -d "$RESOURCE_BUNDLE" ]]; then
   cp -R "$RESOURCE_BUNDLE" "$APP_DIR/Contents/MacOS/"
-  echo "==> Included localization bundle"
+  cp -R "$RESOURCE_BUNDLE" "$APP_DIR/Contents/Resources/"
+  echo "==> Included localization bundle (MacOS + Resources)"
 else
   echo "warning: localization bundle not found at $RESOURCE_BUNDLE" >&2
 fi
