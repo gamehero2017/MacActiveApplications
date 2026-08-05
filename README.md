@@ -2,11 +2,13 @@
 
 macOS 刘海左侧的 Windows 风格任务栏：覆盖菜单栏左侧区域，展示当前运行中的应用，支持切换、恢复最小化/无窗口应用、窗口悬停操作、右键菜单，以及系统 Apps（原启动板）入口。
 
+[English](README_EN.md)
+
 ## 功能
 
 - 吸附在刘海**左侧**，高度与菜单栏一致，默认展开
 - 宽度随运行中应用数量自适应（有上限）
-- 点击把手收起 / 展开（无 hover 自动展开）；**右键把手 →「退出任务栏」**
+- 点击把手收起 / 展开（无 hover 自动展开）；把手仅左键，无右键退出
 - 图标顺序：访达 → Apps（启动板）→ 其它运行中应用（按名称排序）
 - 单击图标：切换到前台；若已是前台且有可见窗口则隐藏（Windows 任务栏语义）
 - 最小化或关窗未退出时，点击可恢复到前台（Dock 式 reopen）
@@ -17,6 +19,12 @@ macOS 刘海左侧的 Windows 风格任务栏：覆盖菜单栏左侧区域，�
 - **右键应用图标**（不含 Apps）：
   - 通用：显示、隐藏、在访达中显示、退出
   - 访达额外：新建访达窗口
+- **汉堡菜单**（最左侧，仅展开时显示）：
+  - 版本信息（不可点）
+  - 辅助功能状态（打开系统设置）
+  - 显示 Apps（勾选）
+  - 开机启动（勾选；需以 `.app` 运行才稳定生效）
+  - 退出任务栏
 - 菜单栏工具形态：不占用 Dock（`LSUIElement` / `.accessory`）
 
 ## 环境要求
@@ -44,7 +52,7 @@ open Package.swift
 
 本工具无 Dock 图标，可用：
 
-- 右键任务栏**把手** → **退出任务栏**
+- 汉堡菜单 → **退出任务栏**
 - 终端 `swift run` 时：`Ctrl + C`
 - 或：`killall MacActiveApplications`
 
@@ -77,11 +85,13 @@ Sources/MacActiveApplications/
     AppWindowService.swift          # 窗口枚举 / 最小/最大/关闭（Accessibility）
     SystemAppsLauncher.swift        # Apps / 启动板切换（CoreDockSendNotification）
     AppContextMenuBuilder.swift     # 应用图标右键菜单
+    TaskbarPreferences.swift        # 设置项（UserDefaults / 开机启动）
+    TaskbarSettingsMenuBuilder.swift # 汉堡 NSMenu
   Panel/
     MenuBarPanel.swift              # 任务栏面板
     WindowPeekController.swift      # 悬停标题栏弹出层
   UI/
-    TaskbarView.swift               # 图标 / 把手 / 命中与菜单
+    TaskbarView.swift               # 图标 / 把手 / 汉堡 / 命中与菜单
     TaskbarStyle.swift              # 尺寸与样式常量
 Resources/
   Info.plist
@@ -100,6 +110,7 @@ docs/
 | 常量 | 含义 |
 |------|------|
 | `handleWidth` / `collapsedWidth` | 收起把手宽度 |
+| `settingsButtonWidth` | 汉堡按钮宽度 |
 | `handleTrailingExtension` | 右缘相对刘海的微调 |
 | `notchVisualCompensationRatio` | 刘海贴合动态补偿比例 |
 | `peekMinWidth` / `peekMaxWidth` | 悬停标题栏宽度范围 |
@@ -134,7 +145,8 @@ docs/
 ## 相关文档
 
 - [更新说明](docs/更新说明.md)
+- [English README](README_EN.md)
 
 ## 许可
 
-按需自行补充。
+未经作者授权，不允许私自转载。
