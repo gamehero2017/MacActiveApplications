@@ -12,24 +12,37 @@ struct TaskbarView: View {
     @Binding var chrome: TaskbarChrome
     let barHeight: CGFloat
     let onChromeChange: (TaskbarChrome) -> Void
+    let onPanelDragBegan: (CGFloat) -> Void
+    let onPanelDragMoved: (CGFloat) -> Void
+    let onPanelDragEnded: () -> Void
+    /// 把手贴刘海：横向收起；拖离后：纵向向上收起。
+    let isFlushToNotch: Bool
 
     private var shape: TaskbarOutlineShape {
-        TaskbarOutlineShape(
-            topLeadingRadius: 0,
-            bottomLeadingRadius: TaskbarStyle.leadingCornerRadius(forBarHeight: barHeight)
+        let corner = TaskbarStyle.leadingCornerRadius(forBarHeight: barHeight)
+        // 纵向收起条带：四角可圆；展开 / 横向收起：上沿直角贴菜单栏。
+        let verticalCollapsed = chrome == .collapsed && !isFlushToNotch
+        return TaskbarOutlineShape(
+            topLeadingRadius: verticalCollapsed ? corner : 0,
+            bottomLeadingRadius: corner,
+            bottomTrailingRadius: corner,
+            topTrailingRadius: verticalCollapsed ? corner : 0
         )
     }
 
     var body: some View {
         ZStack {
-            HStack(spacing: 0) {
-                if chrome == .expanded {
-                    // 汉堡菜单：仅展开时显示；收起后只留把手。
+            if chrome == .expanded {
+                HStack(spacing: 0) {
+                    // 汉堡菜单：点击打开设置；按住拖动可平移整条任务栏。
                     SettingsMenuButton(
                         barHeight: barHeight,
                         chrome: chrome,
                         store: store,
-                        peekController: peekController
+                        peekController: peekController,
+                        onPanelDragBegan: onPanelDragBegan,
+                        onPanelDragMoved: onPanelDragMoved,
+                        onPanelDragEnded: onPanelDragEnded
                     )
                         .frame(width: TaskbarStyle.settingsButtonWidth)
 
@@ -53,14 +66,29 @@ struct TaskbarView: View {
                         .animation(nil, value: store.apps.map(\.id))
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
 
-                HandleButton(chrome: chrome, barHeight: barHeight) {
-                    peekController.hide(immediate: true)
-                    let next: TaskbarChrome = chrome == .collapsed ? .expanded : .collapsed
-                    onChromeChange(next)
+                    HandleButton(chrome: chrome, isFlushToNotch: isFlushToNotch, barHeight: barHeight) {
+                        peekController.hide(immediate: true)
+                        onChromeChange(.collapsed)
+                    }
+                    .frame(width: TaskbarStyle.handleWidth)
                 }
-                .frame(width: TaskbarStyle.handleWidth)
+            } else if isFlushToNotch {
+                // 贴刘海：横向收起，仅剩右侧把手。
+                HStack(spacing: 0) {
+                    HandleButton(chrome: chrome, isFlushToNotch: true, barHeight: barHeight) {
+                        peekController.hide(immediate: true)
+                        onChromeChange(.expanded)
+                    }
+                    .frame(width: TaskbarStyle.handleWidth)
+                }
+            } else {
+                // 未贴刘海：向上收起为顶边细条，宽度仅约一个图标。
+                HandleButton(chrome: chrome, isFlushToNotch: false, barHeight: TaskbarStyle.collapsedStripHeight) {
+                    peekController.hide(immediate: true)
+                    onChromeChange(.expanded)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
             // 拖拽浮层：盖在任务栏最上层，跟随光标（保留按下时的抓取点）。
@@ -85,33 +113,53 @@ struct TaskbarView: View {
     }
 }
 
-/// Trailing corners always square. Leading corners configurable.
+/// Corner radii for the taskbar capsule. Top trailing/leading stay 0 when flush with the menu bar.
 struct TaskbarOutlineShape: Shape {
     var topLeadingRadius: CGFloat
     var bottomLeadingRadius: CGFloat
+    var bottomTrailingRadius: CGFloat = 0
+    var topTrailingRadius: CGFloat = 0
 
     func path(in rect: CGRect) -> Path {
         let maxR = min(rect.height / 2, rect.width / 2)
-        let topR = min(max(0, topLeadingRadius), maxR)
-        let bottomR = min(max(0, bottomLeadingRadius), maxR)
+        let topLeading = min(max(0, topLeadingRadius), maxR)
+        let topTrailing = min(max(0, topTrailingRadius), maxR)
+        let bottomLeading = min(max(0, bottomLeadingRadius), maxR)
+        let bottomTrailing = min(max(0, bottomTrailingRadius), maxR)
         var path = Path()
 
-        path.move(to: CGPoint(x: rect.minX + topR, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX + bottomR, y: rect.maxY))
-        if bottomR > 0 {
+        path.move(to: CGPoint(x: rect.minX + topLeading, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX - topTrailing, y: rect.minY))
+        if topTrailing > 0 {
             path.addQuadCurve(
-                to: CGPoint(x: rect.minX, y: rect.maxY - bottomR),
+                to: CGPoint(x: rect.maxX, y: rect.minY + topTrailing),
+                control: CGPoint(x: rect.maxX, y: rect.minY)
+            )
+        } else {
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        }
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - bottomTrailing))
+        if bottomTrailing > 0 {
+            path.addQuadCurve(
+                to: CGPoint(x: rect.maxX - bottomTrailing, y: rect.maxY),
+                control: CGPoint(x: rect.maxX, y: rect.maxY)
+            )
+        } else {
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        }
+        path.addLine(to: CGPoint(x: rect.minX + bottomLeading, y: rect.maxY))
+        if bottomLeading > 0 {
+            path.addQuadCurve(
+                to: CGPoint(x: rect.minX, y: rect.maxY - bottomLeading),
                 control: CGPoint(x: rect.minX, y: rect.maxY)
             )
         } else {
             path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
         }
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + topR))
-        if topR > 0 {
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + topLeading))
+        if topLeading > 0 {
             path.addQuadCurve(
-                to: CGPoint(x: rect.minX + topR, y: rect.minY),
+                to: CGPoint(x: rect.minX + topLeading, y: rect.minY),
                 control: CGPoint(x: rect.minX, y: rect.minY)
             )
         } else {
@@ -135,10 +183,18 @@ private struct SettingsMenuButton: View {
     @ObservedObject var store: RunningAppsStore
     @ObservedObject var peekController: WindowPeekController
     @ObservedObject private var preferences = TaskbarPreferences.shared
+    let onPanelDragBegan: (CGFloat) -> Void
+    let onPanelDragMoved: (CGFloat) -> Void
+    let onPanelDragEnded: () -> Void
 
     @State private var hovering = false
     /// 菜单打开时三条横线旋转成 X。
     @State private var menuOpen = false
+    /// 按住拖动整条任务栏中。
+    @State private var isDraggingPanel = false
+    /// 拖动时呼吸缩放相位。
+    @State private var dragPulse = false
+    @State private var anchorView: NSView?
 
     private var iconSize: CGFloat { max(10, barHeight * 0.42) }
 
@@ -146,38 +202,44 @@ private struct SettingsMenuButton: View {
         ZStack {
             HamburgerToXIcon(
                 isOpen: menuOpen,
+                isDragging: isDraggingPanel,
+                dragPulse: dragPulse,
                 size: iconSize,
-                color: Color.white.opacity(hovering || menuOpen ? 1 : 0.85)
+                color: Color.white.opacity(hovering || menuOpen || isDraggingPanel ? 1 : 0.85)
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(hovering || menuOpen ? Color.white.opacity(0.20) : Color.clear)
+                    .fill(hovering || menuOpen || isDraggingPanel ? Color.white.opacity(isDraggingPanel ? 0.28 : 0.20) : Color.clear)
             )
+            .scaleEffect(isDraggingPanel ? (dragPulse ? 1.12 : 1.04) : 1)
             .allowsHitTesting(false)
 
             AppIconHitView(
-                onView: { _ in },
-                onLeftClick: {},
+                onView: { anchorView = $0 },
+                onLeftClick: {
+                    openSettingsMenu()
+                },
                 onRightClick: { _, _ in },
                 onHover: { hovering = $0 },
-                onLeftClickWithEvent: { view, _ in
+                onDragBegan: { _, _ in
                     peekController.hide(immediate: true)
-                    let menu = TaskbarSettingsMenuBuilder.menu(
-                        store: store,
-                        preferences: preferences,
-                        peekController: peekController,
-                        chromeExpanded: chrome == .expanded
-                    )
-                    // 先播旋转，再阻塞式弹出菜单；关闭后转回汉堡。
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
-                        menuOpen = true
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                        isDraggingPanel = true
                     }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                        TaskbarSettingsMenuBuilder.popUp(menu: menu, from: view)
-                        withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
-                            menuOpen = false
-                        }
+                    withAnimation(.easeInOut(duration: 0.42).repeatForever(autoreverses: true)) {
+                        dragPulse = true
+                    }
+                    onPanelDragBegan(NSEvent.mouseLocation.x)
+                },
+                onDragMoved: { _, _ in
+                    onPanelDragMoved(NSEvent.mouseLocation.x)
+                },
+                onDragEnded: { _, _ in
+                    onPanelDragEnded()
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                        isDraggingPanel = false
+                        dragPulse = false
                     }
                 }
             )
@@ -186,51 +248,88 @@ private struct SettingsMenuButton: View {
         .contentShape(Rectangle())
         .help(L10n.settings)
     }
+
+    private func openSettingsMenu() {
+        guard let view = anchorView else { return }
+        peekController.hide(immediate: true)
+        let menu = TaskbarSettingsMenuBuilder.menu(
+            store: store,
+            preferences: preferences,
+            peekController: peekController,
+            chromeExpanded: chrome == .expanded
+        )
+        // 先播旋转，再阻塞式弹出菜单；关闭后转回汉堡。
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+            menuOpen = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            TaskbarSettingsMenuBuilder.popUp(menu: menu, from: view)
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                menuOpen = false
+            }
+        }
+    }
 }
 
-/// 三条横线 ↔ X（上下两线旋转交叉，中线淡出）。
+/// 三条横线 ↔ X；拖动任务栏时收成抓手感并轻微错开。
 private struct HamburgerToXIcon: View {
     let isOpen: Bool
+    var isDragging: Bool = false
+    var dragPulse: Bool = false
     let size: CGFloat
     let color: Color
 
     var body: some View {
         let lineHeight = max(1.5, size * 0.14)
-        let lineWidth = size * 1.15
-        let spacing = size * 0.32
+        let lineWidth = size * (isDragging ? (dragPulse ? 0.72 : 0.88) : 1.15)
+        let spacing = size * (isDragging ? (dragPulse ? 0.42 : 0.28) : 0.32)
+        let dragShift = isDragging ? size * (dragPulse ? 0.12 : -0.08) : 0
 
         ZStack {
             Capsule()
                 .fill(color)
                 .frame(width: lineWidth, height: lineHeight)
-                .offset(y: isOpen ? 0 : -spacing)
+                .offset(x: isDragging ? dragShift : 0, y: isOpen ? 0 : -spacing)
                 .rotationEffect(.degrees(isOpen ? 45 : 0))
 
             Capsule()
                 .fill(color)
-                .frame(width: lineWidth, height: lineHeight)
+                .frame(width: lineWidth * (isDragging ? 0.85 : 1), height: lineHeight)
                 .opacity(isOpen ? 0 : 1)
                 .scaleEffect(x: isOpen ? 0.2 : 1, y: 1, anchor: .center)
+                .offset(x: isDragging ? -dragShift * 0.6 : 0)
 
             Capsule()
                 .fill(color)
                 .frame(width: lineWidth, height: lineHeight)
-                .offset(y: isOpen ? 0 : spacing)
+                .offset(x: isDragging ? dragShift : 0, y: isOpen ? 0 : spacing)
                 .rotationEffect(.degrees(isOpen ? -45 : 0))
         }
         .frame(width: size * 1.2, height: size * 1.2)
         .animation(.spring(response: 0.32, dampingFraction: 0.78), value: isOpen)
+        .animation(.easeInOut(duration: 0.42), value: dragPulse)
+        .animation(.spring(response: 0.28, dampingFraction: 0.72), value: isDragging)
     }
 }
 
 private struct HandleButton: View {
     let chrome: TaskbarChrome
+    let isFlushToNotch: Bool
     let barHeight: CGFloat
     let action: () -> Void
 
+    private var symbolName: String {
+        switch (chrome, isFlushToNotch) {
+        case (.expanded, true): return "chevron.right"
+        case (.collapsed, true): return "chevron.left"
+        case (.expanded, false): return "chevron.up"
+        case (.collapsed, false): return "chevron.down"
+        }
+    }
+
     var body: some View {
         ZStack {
-            Image(systemName: chrome == .collapsed ? "chevron.left" : "chevron.right")
+            Image(systemName: symbolName)
                 .font(.system(size: max(9, barHeight * 0.38), weight: .semibold))
                 .foregroundStyle(Color.white.opacity(0.85))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

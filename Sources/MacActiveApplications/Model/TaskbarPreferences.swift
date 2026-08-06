@@ -16,6 +16,7 @@ final class TaskbarPreferences: ObservableObject {
         static let rememberChromeState = "taskbar.rememberChromeState"
         static let chromeExpanded = "taskbar.chromeExpanded"
         static let iconOrder = "taskbar.iconOrder"
+        static let panelTrailingOffset = "taskbar.panelTrailingOffset"
     }
 
     /// 是否在任务栏显示 Apps / 启动板入口。
@@ -51,6 +52,11 @@ final class TaskbarPreferences: ObservableObject {
         didSet { UserDefaults.standard.set(iconOrder, forKey: Keys.iconOrder) }
     }
 
+    /// 任务栏相对刘海贴齐位置向左的偏移（pt）；0 表示把手贴刘海。
+    @Published private(set) var panelTrailingOffset: CGFloat {
+        didSet { UserDefaults.standard.set(Double(panelTrailingOffset), forKey: Keys.panelTrailingOffset) }
+    }
+
     private init() {
         showAppsLauncher = Self.bool(Keys.showAppsLauncher, default: true)
         showFinder = Self.bool(Keys.showFinder, default: true)
@@ -58,11 +64,22 @@ final class TaskbarPreferences: ObservableObject {
         showUnreadBadgeDot = Self.bool(Keys.showUnreadBadgeDot, default: true)
         rememberChromeState = Self.bool(Keys.rememberChromeState, default: false)
         iconOrder = UserDefaults.standard.stringArray(forKey: Keys.iconOrder) ?? []
+        if UserDefaults.standard.object(forKey: Keys.panelTrailingOffset) != nil {
+            panelTrailingOffset = CGFloat(UserDefaults.standard.double(forKey: Keys.panelTrailingOffset))
+        } else {
+            panelTrailingOffset = 0
+        }
     }
 
     func saveIconOrder(_ order: [String]) {
         guard order != iconOrder else { return }
         iconOrder = order
+    }
+
+    func savePanelTrailingOffset(_ offset: CGFloat) {
+        let next = max(0, offset)
+        guard abs(next - panelTrailingOffset) > 0.05 else { return }
+        panelTrailingOffset = next
     }
 
     /// 启动时应使用的展开状态。

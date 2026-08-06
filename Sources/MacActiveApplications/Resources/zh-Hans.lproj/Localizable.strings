@@ -11,7 +11,7 @@
 "menu.quit_taskbar" = "退出任务栏";
 
 /* Tooltips */
-"tooltip.settings" = "设置";
+"tooltip.settings" = "设置 — 点击打开菜单，拖动可移动任务栏";
 "tooltip.expand" = "展开任务栏";
 "tooltip.collapse" = "收起任务栏";
 

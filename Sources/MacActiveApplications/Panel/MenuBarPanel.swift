@@ -18,10 +18,17 @@ final class MenuBarPanelController: NSObject {
     private var spaceObserver: NSObjectProtocol?
     private var boundBarHeight: CGFloat?
 
+    /// 相对刘海的向左偏移；拖拽中用 live 值，结束后写入偏好。
+    private var trailingOffset: CGFloat = 0
+    private var panelDragStartScreenX: CGFloat?
+    private var panelDragStartOffset: CGFloat = 0
+    private var lastPresentedFlush: Bool?
+
     init(store: RunningAppsStore, peekController: WindowPeekController) {
         self.store = store
         self.peekController = peekController
         self.chrome = TaskbarPreferences.shared.initialChromeExpanded ? .expanded : .collapsed
+        self.trailingOffset = TaskbarPreferences.shared.panelTrailingOffset
 
         let panel = MenuBarPanel(
             contentRect: .zero,
@@ -47,7 +54,11 @@ final class MenuBarPanelController: NSObject {
                 peekController: peekController,
                 chrome: .constant(.expanded),
                 barHeight: 24,
-                onChromeChange: { _ in }
+                onChromeChange: { _ in },
+                onPanelDragBegan: { _ in },
+                onPanelDragMoved: { _ in },
+                onPanelDragEnded: {},
+                isFlushToNotch: true
             )
         )
         hosting.autoresizingMask = [.width, .height]
@@ -118,19 +129,36 @@ final class MenuBarPanelController: NSObject {
         TaskbarPreferences.shared.saveChromeExpanded(next == .expanded)
         peekController.hide(immediate: true)
         rebindRoot()
-        // 显示桌面场景下优先瞬时落地，避免 animator 从 Exposé 临时几何插值出错。
-        relayoutFrame(animated: false)
+        // 贴刘海横向收起：瞬时落地（显示桌面兼容）；未贴刘海纵向收起：轻微动画。
+        relayoutFrame(animated: !isFlushToNotch)
         panel.orderFrontRegardless()
     }
 
+    /// 贴刘海（把手贴 notch）时横向收起；拖离后改为纵向向上收起。
+    private var isFlushToNotch: Bool {
+        trailingOffset <= TaskbarStyle.notchFlushTolerance
+    }
+
     private func desiredWidth(in slot: MenuBarSlot) -> CGFloat {
+        if chrome == .collapsed && !isFlushToNotch {
+            // 向上收起：高度仍为细条，宽度仅约一个图标；右缘由 trailingOffset 保持。
+            return TaskbarStyle.detachedCollapsedHandleWidth(forBarHeight: slot.barHeight)
+        }
+        let useExpandedWidth = chrome == .expanded
         let content = TaskbarStyle.contentWidth(
             appCount: store.apps.count,
             barHeight: slot.barHeight,
-            chrome: chrome == .expanded
+            chrome: useExpandedWidth
         )
         let maxWidth = TaskbarStyle.maxExpandedWidth(slotWidth: slot.availableFrame.width)
         return min(content, maxWidth)
+    }
+
+    private func desiredHeight(in slot: MenuBarSlot) -> CGFloat {
+        if chrome == .collapsed && !isFlushToNotch {
+            return TaskbarStyle.collapsedStripHeight
+        }
+        return slot.barHeight
     }
 
     private func relayout(animated: Bool) {
@@ -140,6 +168,8 @@ final class MenuBarPanelController: NSObject {
         if boundBarHeight != slot.barHeight {
             boundBarHeight = slot.barHeight
             rebindRoot(barHeight: slot.barHeight)
+        } else {
+            presentFlushIfNeeded()
         }
         applyFrame(desiredWidth(in: slot), in: slot, animated: animated)
     }
@@ -147,11 +177,21 @@ final class MenuBarPanelController: NSObject {
     private func relayoutFrame(animated: Bool) {
         guard let slot = MenuBarGeometry.slot() else { return }
         self.slot = slot
+        presentFlushIfNeeded()
         applyFrame(desiredWidth(in: slot), in: slot, animated: animated)
     }
 
     private func applyFrame(_ width: CGFloat, in slot: MenuBarSlot, animated: Bool) {
-        let frame = MenuBarGeometry.panelFrame(width: width, in: slot)
+        trailingOffset = MenuBarGeometry.clampedTrailingOffset(trailingOffset, width: width, in: slot)
+        let height = desiredHeight(in: slot)
+        let pinToTop = chrome == .collapsed && !isFlushToNotch
+        let frame = MenuBarGeometry.panelFrame(
+            width: width,
+            height: height,
+            in: slot,
+            trailingOffset: trailingOffset,
+            pinToTop: pinToTop
+        )
         // 清掉可能被「显示桌面」打断的残留动画，防止目标 frame 与实际不同步。
         panel.animations = [:]
 
@@ -175,9 +215,55 @@ final class MenuBarPanelController: NSObject {
         }
     }
 
+    // MARK: - 汉堡拖动整条任务栏
+
+    private func beginPanelDrag(screenX: CGFloat) {
+        peekController.hide(immediate: true)
+        // 纵向收起时先展开再拖，避免拖条带错位。
+        if chrome == .collapsed && !isFlushToNotch {
+            chrome = .expanded
+            TaskbarPreferences.shared.saveChromeExpanded(true)
+            rebindRoot()
+            if let slot {
+                applyFrame(desiredWidth(in: slot), in: slot, animated: false)
+            }
+        }
+        panelDragStartScreenX = screenX
+        panelDragStartOffset = trailingOffset
+    }
+
+    private func updatePanelDrag(screenX: CGFloat) {
+        guard let startX = panelDragStartScreenX, let slot else { return }
+        // 鼠标右移 → 任务栏右移 → 减小相对刘海的向左偏移。
+        let delta = screenX - startX
+        let width = desiredWidth(in: slot)
+        trailingOffset = MenuBarGeometry.clampedTrailingOffset(
+            panelDragStartOffset - delta,
+            width: width,
+            in: slot
+        )
+        // 拖拽中不 rebind，避免命中层被重建打断拖动手势；松手后再切换箭头样式。
+        applyFrame(width, in: slot, animated: false)
+    }
+
+    private func endPanelDrag() {
+        panelDragStartScreenX = nil
+        TaskbarPreferences.shared.savePanelTrailingOffset(trailingOffset)
+        presentFlushIfNeeded()
+    }
+
+    private func presentFlushIfNeeded() {
+        let flush = isFlushToNotch
+        guard lastPresentedFlush != flush else { return }
+        lastPresentedFlush = flush
+        rebindRoot()
+    }
+
     private func rebindRoot(barHeight: CGFloat? = nil) {
         let height = barHeight ?? slot?.barHeight ?? 24
         boundBarHeight = height
+        let flush = isFlushToNotch
+        lastPresentedFlush = flush
         hosting.rootView = TaskbarRootView(
             store: store,
             peekController: peekController,
@@ -188,7 +274,17 @@ final class MenuBarPanelController: NSObject {
             barHeight: height,
             onChromeChange: { [weak self] next in
                 self?.setChrome(next)
-            }
+            },
+            onPanelDragBegan: { [weak self] screenX in
+                self?.beginPanelDrag(screenX: screenX)
+            },
+            onPanelDragMoved: { [weak self] screenX in
+                self?.updatePanelDrag(screenX: screenX)
+            },
+            onPanelDragEnded: { [weak self] in
+                self?.endPanelDrag()
+            },
+            isFlushToNotch: flush
         )
     }
 }
@@ -199,6 +295,10 @@ struct TaskbarRootView: View {
     @Binding var chrome: TaskbarChrome
     let barHeight: CGFloat
     let onChromeChange: (TaskbarChrome) -> Void
+    let onPanelDragBegan: (CGFloat) -> Void
+    let onPanelDragMoved: (CGFloat) -> Void
+    let onPanelDragEnded: () -> Void
+    let isFlushToNotch: Bool
 
     var body: some View {
         TaskbarView(
@@ -206,7 +306,11 @@ struct TaskbarRootView: View {
             peekController: peekController,
             chrome: $chrome,
             barHeight: barHeight,
-            onChromeChange: onChromeChange
+            onChromeChange: onChromeChange,
+            onPanelDragBegan: onPanelDragBegan,
+            onPanelDragMoved: onPanelDragMoved,
+            onPanelDragEnded: onPanelDragEnded,
+            isFlushToNotch: isFlushToNotch
         )
     }
 }

@@ -1,14 +1,41 @@
 # Mac Active Applications
 
-A Windows-style taskbar for macOS, docked to the **left of the notch**. It covers the left portion of the menu bar, lists running apps, and supports switch / restore, drag-to-reorder, unread badge dots, hover window actions, context menus, and a system Apps (formerly Launchpad) entry.
+A Windows-style taskbar that lives in the macOS menu-bar area. It lists running apps and supports switch / restore, drag-to-reorder, drag-to-reposition, dual collapse modes, unread badge dots, hover window actions, context menus, and a system Apps (formerly Launchpad) entry.
+
+Not limited to notched Macs — with a notch it can sit flush to the left of the cutout; without one (or on an external display) it uses the left usable part of the menu bar. Drag away from the right edge and **collapse upward** into a thin strip so it stays tidy on most screens.
 
 [中文说明](README.md)
 
+## Screenshots
+
+Expanded (flush with the right edge, handle `>`):
+
+![Expanded taskbar](docs/QQ20260806-145436.png)
+
+Collapsed sideways to handle `<` only:
+
+![Collapsed sideways](docs/QQ20260806-145451.png)
+
+Expanded after dragging away (handle `∧`, collapses upward):
+
+![Detached expanded](docs/QQ20260806-145632.png)
+
+Hamburger settings menu:
+
+![Settings menu](docs/QQ20260806-145510.png)
+
+Hover window list:
+
+![Hover window list](docs/QQ20260806-145534.png)
+
 ## Features
 
-- Snaps to the **left** of the notch; height matches the menu bar; expanded by default
+- Menu-bar height, flush with the top edge; defaults beside the notch when present, otherwise in the left usable menu-bar strip; rounded bottom corners
 - Width scales with the number of running apps (with a maximum)
+- **Drag the hamburger** horizontally within the usable strip to reposition the bar (persisted); **click** still opens settings
 - Handle click collapses / expands (no auto-expand on hover)
+  - **Flush with the strip’s right edge** (the notch when present): `>` / `<`, collapse sideways to the right-side handle
+  - **Detached from that edge**: `∧` / `∨`, collapse upward into a thin top strip about one icon wide (typical on non-notch displays)
 - Default icon order: Finder → Apps (Launchpad) → other running apps (by name); **drag to reorder**, order is remembered
 - Single-click icon: bring to front; if already frontmost with visible windows, hide (Windows taskbar semantics)
 - Minimized or window-closed-but-still-running apps can be restored on click (Dock-like reopen)
@@ -69,6 +96,15 @@ This tool has no Dock icon. You can:
 ./scripts/package-dmg.sh
 ```
 
+By default this builds a **Universal** app (`arm64` + `x86_64`) in one DMG. Single-arch builds:
+
+```bash
+ARCHS=arm64 ./scripts/package-dmg.sh
+ARCHS=x86_64 ./scripts/package-dmg.sh
+```
+
+Building `x86_64` on Apple Silicon requires Rosetta. Verify with `lipo -archs dist/MacActiveApplications.app/Contents/MacOS/MacActiveApplications`.
+
 Outputs:
 
 - `dist/MacActiveApplications.app`
@@ -83,7 +119,7 @@ Install: open the DMG and drag the app to Applications. On first launch, enable 
 ```text
 Sources/MacActiveApplications/
   AppDelegate.swift                 # Entry point
-  Geometry/MenuBarGeometry.swift    # Notch snap & menu-bar geometry
+  Geometry/MenuBarGeometry.swift    # Menu-bar usable strip / notch flush geometry
   Model/
     RunningAppsStore.swift          # Running apps, order, activation, context actions
     RunningAppItem.swift
@@ -119,10 +155,12 @@ In `UI/TaskbarStyle.swift`:
 
 | Constant | Meaning |
 |----------|---------|
-| `handleWidth` / `collapsedWidth` | Collapsed handle width |
+| `handleWidth` / `collapsedWidth` | Sideways-collapsed handle width when flush with the right edge |
+| `detachedCollapsedHandleWidth` | Upward-collapsed strip width when detached |
+| `collapsedStripHeight` | Top-strip height when collapsed upward |
 | `settingsButtonWidth` | Hamburger button width |
-| `handleTrailingExtension` | Fine-tune trailing edge vs notch |
-| `notchVisualCompensationRatio` | Dynamic notch-fit compensation |
+| `handleTrailingExtension` | Right-edge flush fine-tune (vs notch when present) |
+| `notchVisualCompensationRatio` | Visual flush compensation when a notch is present |
 | `peekMinWidth` / `peekMaxWidth` | Hover title-list width range |
 | `peekHideDelay` | Delay before hiding peek after hover leave |
 | `unreadBadgeDotMin` / `Max` | Unread badge dot size range |
@@ -150,7 +188,7 @@ Without Accessibility, the taskbar itself still works; window title-bar actions 
 
 ## Known limitations
 
-- Covers some left-side system menu-bar items (by design)
+- When expanded, occupies part of the left menu bar and may cover some system items (by design; drag aside or collapse upward)
 - Maximize geometry may need recalibration on unusual multi-monitor layouts
 - Apps entry depends on Dock interfaces; behavior may vary on extreme OS versions
 - Unread dots require the app’s Dock tile badge and Accessibility; apps removed from the Dock won’t show dots

@@ -7,11 +7,15 @@ enum TaskbarStyle {
     static let handleWidth: CGFloat = 22
     /// 收起时只留把手。
     static let collapsedWidth: CGFloat = handleWidth
+    /// 未贴刘海时纵向收起后的条带高度。
+    static let collapsedStripHeight: CGFloat = 16
+    /// 判定「贴刘海」的 trailingOffset 容差（pt）。
+    static let notchFlushTolerance: CGFloat = 1.5
     static let horizontalPadding: CGFloat = 4
     static let iconSpacing: CGFloat = 2
     /// Keep a little air on the leading edge so the rounded corner doesn't clip system menus.
     static let edgeInset: CGFloat = 2
-    /// Matches the menu-bar / notch capsule corner feel (bottom-leading only).
+    /// Matches the menu-bar / notch capsule corner feel (bottom leading & trailing).
     static let leadingCornerRadius: CGFloat = 10
     /// Extra width per icon cell beyond the drawn icon (highlight padding).
     static let iconCellPadding: CGFloat = 2
@@ -40,6 +44,11 @@ enum TaskbarStyle {
 
     static func iconSize(forBarHeight height: CGFloat) -> CGFloat {
         max(12, height - 6)
+    }
+
+    /// 拖离刘海向上收起后：把手宽度约一个图标格。
+    static func detachedCollapsedHandleWidth(forBarHeight height: CGFloat) -> CGFloat {
+        max(collapsedWidth, iconSize(forBarHeight: height) + iconCellPadding)
     }
 
     static func unreadBadgeDotSize(forIconSize size: CGFloat) -> CGFloat {

@@ -1,14 +1,41 @@
 # Mac Active Applications
 
-macOS 刘海左侧的 Windows 风格任务栏：覆盖菜单栏左侧区域，展示当前运行中的应用，支持切换、恢复最小化/无窗口应用、拖拽排序、未读红点、窗口悬停操作、右键菜单，以及系统 Apps（原启动板）入口。
+贴在菜单栏区域的 Windows 风格任务栏：列出当前运行中的应用，支持切换与恢复、拖拽排序、拖动整栏位置、双模式收起、未读红点、悬停窗口操作、右键菜单，以及系统 Apps（原启动板）入口。
+
+不限刘海机型——有刘海时可贴在缺口左侧；无刘海或外接屏则使用菜单栏左侧可用区。拖离右缘后可**向上收起**成细条，多数显示器都能干净收纳。
 
 [English](README_EN.md)
 
+## 截图
+
+展开（贴齐右缘，把手 `>`）：
+
+![展开任务栏](docs/QQ20260806-145436.png)
+
+横向收起后仅剩把手 `<`：
+
+![横向收起](docs/QQ20260806-145451.png)
+
+拖离右缘后展开（把手 `∧`，可向上收起）：
+
+![拖离后展开](docs/QQ20260806-145632.png)
+
+汉堡设置菜单：
+
+![汉堡设置](docs/QQ20260806-145510.png)
+
+悬停窗口列表：
+
+![悬停窗口列表](docs/QQ20260806-145534.png)
+
 ## 功能
 
-- 吸附在刘海**左侧**，高度与菜单栏一致，默认展开
+- 贴在菜单栏高度、上沿齐顶；有刘海时默认靠缺口左侧，无刘海时落在菜单栏左侧可用区；下沿圆角
 - 宽度随运行中应用数量自适应（有上限）
+- **按住汉堡**可在可用区内水平拖动整条任务栏，松手后记住位置；**点击**汉堡仍打开设置
 - 点击把手收起 / 展开（无 hover 自动展开）；把手仅左键，无右键退出
+  - **贴齐可用区右缘**（有刘海即贴缺口）：`>` / `<`，横向收起只留右侧把手
+  - **拖离右缘后**：`∧` / `∨`，向上收成约一图标宽的顶边细条（无刘海机型的常用收纳方式）
 - 默认图标顺序：访达 → Apps（启动板）→ 其它运行中应用（按名称）；**可拖拽排序**，松手后记住位置
 - 单击图标：切换到前台；若已是前台且有可见窗口则隐藏（Windows 任务栏语义）
 - 最小化或关窗未退出时，点击可恢复到前台（Dock 式 reopen）
@@ -69,6 +96,15 @@ open Package.swift
 ./scripts/package-dmg.sh
 ```
 
+默认打出 **Universal**（`arm64` + `x86_64`）一份 `.app` / DMG，Apple Silicon 与 Intel 都可安装。也可只打单架构：
+
+```bash
+ARCHS=arm64 ./scripts/package-dmg.sh    # 仅 Apple Silicon
+ARCHS=x86_64 ./scripts/package-dmg.sh   # 仅 Intel
+```
+
+在 Apple Silicon 上编 `x86_64` 需已安装 Rosetta（系统会按需提示）。可用 `lipo -archs dist/MacActiveApplications.app/Contents/MacOS/MacActiveApplications` 确认架构。
+
 产物：
 
 - `dist/MacActiveApplications.app`
@@ -85,7 +121,7 @@ open Package.swift
 ```text
 Sources/MacActiveApplications/
   AppDelegate.swift                 # 入口
-  Geometry/MenuBarGeometry.swift    # 刘海吸附与菜单栏几何
+  Geometry/MenuBarGeometry.swift    # 菜单栏可用区 / 刘海贴齐几何
   Model/
     RunningAppsStore.swift          # 运行中应用列表、排序、激活与右键动作
     RunningAppItem.swift
@@ -121,10 +157,12 @@ docs/
 
 | 常量 | 含义 |
 |------|------|
-| `handleWidth` / `collapsedWidth` | 收起把手宽度 |
+| `handleWidth` / `collapsedWidth` | 贴齐右缘时横向收起的把手宽度 |
+| `detachedCollapsedHandleWidth` | 拖离后向上收起条带宽度 |
+| `collapsedStripHeight` | 向上收起时的顶边细条高度 |
 | `settingsButtonWidth` | 汉堡按钮宽度 |
-| `handleTrailingExtension` | 右缘相对刘海的微调 |
-| `notchVisualCompensationRatio` | 刘海贴合动态补偿比例 |
+| `handleTrailingExtension` | 右缘贴齐微调（有刘海时相对缺口） |
+| `notchVisualCompensationRatio` | 有刘海时贴齐视觉补偿比例 |
 | `peekMinWidth` / `peekMaxWidth` | 悬停标题栏宽度范围 |
 | `peekHideDelay` | 悬停离开后收起延迟 |
 | `unreadBadgeDotMin` / `Max` | 未读红点尺寸范围 |
@@ -152,7 +190,7 @@ docs/
 
 ## 已知限制
 
-- 会遮挡菜单栏左侧部分系统菜单项（产品设计如此）
+- 展开时会占用菜单栏左侧一段区域，可能挡住部分系统菜单项（产品设计如此；可拖开或向上收起）
 - 最大化几何在极端多屏布局下可能需再校准
 - Apps 入口依赖系统 Dock 接口；极端系统版本差异下行为可能需再验证
 - 未读红点依赖 Dock 中对应图标的角标；移出 Dock 或未授权辅助功能时无法显示

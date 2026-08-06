@@ -44,14 +44,41 @@ enum MenuBarGeometry {
         return MenuBarSlot(availableFrame: frame, snapMaxX: frame.maxX, screen: screen)
     }
 
-    /// Panel frame anchored flush to the notch left edge, growing leftward.
-    static func panelFrame(width: CGFloat, in slot: MenuBarSlot) -> NSRect {
+    /// Panel frame: trailing edge inset from notch snap by `trailingOffset` (0 = flush).
+    /// - Parameters:
+    ///   - height: panel height; when vertically collapsed use a thin strip and pin to the top of the slot.
+    ///   - pinToTop: if true, align to `availableFrame.maxY` (向上收起后留顶边条带).
+    static func panelFrame(
+        width: CGFloat,
+        height: CGFloat? = nil,
+        in slot: MenuBarSlot,
+        trailingOffset: CGFloat = 0,
+        pinToTop: Bool = false
+    ) -> NSRect {
         let maxWidth = max(TaskbarStyle.collapsedWidth, slot.availableFrame.width - TaskbarStyle.edgeInset)
         let clampedWidth = min(max(width, TaskbarStyle.collapsedWidth), maxWidth)
-        let height = slot.barHeight
-        let x = slot.snapMaxX - clampedWidth
-        let y = slot.availableFrame.minY
-        return NSRect(x: x, y: y, width: clampedWidth, height: height)
+        let fullHeight = slot.barHeight
+        let clampedHeight = min(max(height ?? fullHeight, TaskbarStyle.collapsedStripHeight), fullHeight)
+        let offset = clampedTrailingOffset(trailingOffset, width: clampedWidth, in: slot)
+        let x = slot.snapMaxX - clampedWidth - offset
+        let y: CGFloat
+        if pinToTop {
+            y = slot.availableFrame.maxY - clampedHeight
+        } else {
+            y = slot.availableFrame.minY
+        }
+        return NSRect(x: x, y: y, width: clampedWidth, height: clampedHeight)
+    }
+
+    /// How far left the panel’s trailing edge may sit from `snapMaxX`.
+    static func maxTrailingOffset(width: CGFloat, in slot: MenuBarSlot) -> CGFloat {
+        let maxWidth = max(TaskbarStyle.collapsedWidth, slot.availableFrame.width - TaskbarStyle.edgeInset)
+        let clampedWidth = min(max(width, TaskbarStyle.collapsedWidth), maxWidth)
+        return max(0, slot.snapMaxX - clampedWidth - slot.availableFrame.minX - TaskbarStyle.edgeInset)
+    }
+
+    static func clampedTrailingOffset(_ offset: CGFloat, width: CGFloat, in slot: MenuBarSlot) -> CGFloat {
+        min(max(0, offset), maxTrailingOffset(width: width, in: slot))
     }
 
     /// Dynamic right-edge snap: AppKit safe trailing edge + height/scale compensation

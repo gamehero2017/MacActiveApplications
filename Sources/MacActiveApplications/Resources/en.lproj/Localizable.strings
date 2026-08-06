@@ -11,7 +11,7 @@
 "menu.quit_taskbar" = "Quit Taskbar";
 
 /* Tooltips */
-"tooltip.settings" = "Settings";
+"tooltip.settings" = "Settings — click for menu, drag to move taskbar";
 "tooltip.expand" = "Expand taskbar";
 "tooltip.collapse" = "Collapse taskbar";
 
