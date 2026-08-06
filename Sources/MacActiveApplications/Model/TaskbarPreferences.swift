@@ -3,16 +3,19 @@ import ApplicationServices
 import Foundation
 import ServiceManagement
 
-/// 任务栏偏好：Apps 显示、Peek、展开状态、开机启动等。
+/// 任务栏偏好：访达 / Apps 显示、Peek、未读红点、展开状态、开机启动等。
 @MainActor
 final class TaskbarPreferences: ObservableObject {
     static let shared = TaskbarPreferences()
 
     private enum Keys {
         static let showAppsLauncher = "taskbar.showAppsLauncher"
+        static let showFinder = "taskbar.showFinder"
         static let showWindowPeekOnHover = "taskbar.showWindowPeekOnHover"
+        static let showUnreadBadgeDot = "taskbar.showUnreadBadgeDot"
         static let rememberChromeState = "taskbar.rememberChromeState"
         static let chromeExpanded = "taskbar.chromeExpanded"
+        static let iconOrder = "taskbar.iconOrder"
     }
 
     /// 是否在任务栏显示 Apps / 启动板入口。
@@ -20,9 +23,22 @@ final class TaskbarPreferences: ObservableObject {
         didSet { UserDefaults.standard.set(showAppsLauncher, forKey: Keys.showAppsLauncher) }
     }
 
+    /// 是否在任务栏显示访达。
+    @Published var showFinder: Bool {
+        didSet { UserDefaults.standard.set(showFinder, forKey: Keys.showFinder) }
+    }
+
     /// 悬停应用图标时是否弹出窗口标题栏列表。
     @Published var showWindowPeekOnHover: Bool {
         didSet { UserDefaults.standard.set(showWindowPeekOnHover, forKey: Keys.showWindowPeekOnHover) }
+    }
+
+    /// 是否根据 Dock 角标在任务栏显示未读红点；关闭后彻底停止轮询。
+    @Published var showUnreadBadgeDot: Bool {
+        didSet {
+            UserDefaults.standard.set(showUnreadBadgeDot, forKey: Keys.showUnreadBadgeDot)
+            DockBadgeMonitor.shared.syncWithPreference()
+        }
     }
 
     /// 是否记住上次展开/收起；关闭则每次启动均为展开。
@@ -30,10 +46,23 @@ final class TaskbarPreferences: ObservableObject {
         didSet { UserDefaults.standard.set(rememberChromeState, forKey: Keys.rememberChromeState) }
     }
 
+    /// 任务栏图标顺序（`bundleIdentifier` 列表）；空则使用默认排序。
+    @Published private(set) var iconOrder: [String] {
+        didSet { UserDefaults.standard.set(iconOrder, forKey: Keys.iconOrder) }
+    }
+
     private init() {
         showAppsLauncher = Self.bool(Keys.showAppsLauncher, default: true)
+        showFinder = Self.bool(Keys.showFinder, default: true)
         showWindowPeekOnHover = Self.bool(Keys.showWindowPeekOnHover, default: true)
+        showUnreadBadgeDot = Self.bool(Keys.showUnreadBadgeDot, default: true)
         rememberChromeState = Self.bool(Keys.rememberChromeState, default: false)
+        iconOrder = UserDefaults.standard.stringArray(forKey: Keys.iconOrder) ?? []
+    }
+
+    func saveIconOrder(_ order: [String]) {
+        guard order != iconOrder else { return }
+        iconOrder = order
     }
 
     /// 启动时应使用的展开状态。

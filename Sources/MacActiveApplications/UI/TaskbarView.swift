@@ -21,43 +21,62 @@ struct TaskbarView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            if chrome == .expanded {
-                // 汉堡菜单：仅展开时显示；收起后只留把手。
-                SettingsMenuButton(
-                    barHeight: barHeight,
-                    chrome: chrome,
-                    store: store,
-                    peekController: peekController
-                )
-                    .frame(width: TaskbarStyle.settingsButtonWidth)
+        ZStack {
+            HStack(spacing: 0) {
+                if chrome == .expanded {
+                    // 汉堡菜单：仅展开时显示；收起后只留把手。
+                    SettingsMenuButton(
+                        barHeight: barHeight,
+                        chrome: chrome,
+                        store: store,
+                        peekController: peekController
+                    )
+                        .frame(width: TaskbarStyle.settingsButtonWidth)
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: TaskbarStyle.iconSpacing) {
-                        ForEach(store.apps) { app in
-                            AppIconButton(
-                                app: app,
-                                size: TaskbarStyle.iconSize(forBarHeight: barHeight),
-                                store: store,
-                                peekController: peekController
-                            ) {
-                                peekController.hide(immediate: true)
-                                store.activateOrHide(pid: app.id)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: TaskbarStyle.iconSpacing) {
+                            ForEach(store.apps) { app in
+                                AppIconButton(
+                                    app: app,
+                                    size: TaskbarStyle.iconSize(forBarHeight: barHeight),
+                                    store: store,
+                                    peekController: peekController,
+                                    isDragging: store.draggingPID == app.id
+                                ) {
+                                    peekController.hide(immediate: true)
+                                    store.activateOrHide(pid: app.id)
+                                }
                             }
                         }
+                        .padding(.leading, TaskbarStyle.horizontalPadding)
+                        .padding(.trailing, TaskbarStyle.iconsHandleGap(forBarHeight: barHeight))
+                        .animation(nil, value: store.apps.map(\.id))
                     }
-                    .padding(.leading, TaskbarStyle.horizontalPadding)
-                    .padding(.trailing, TaskbarStyle.iconsHandleGap(forBarHeight: barHeight))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                HandleButton(chrome: chrome, barHeight: barHeight) {
+                    peekController.hide(immediate: true)
+                    let next: TaskbarChrome = chrome == .collapsed ? .expanded : .collapsed
+                    onChromeChange(next)
+                }
+                .frame(width: TaskbarStyle.handleWidth)
             }
 
-            HandleButton(chrome: chrome, barHeight: barHeight) {
-                peekController.hide(immediate: true)
-                let next: TaskbarChrome = chrome == .collapsed ? .expanded : .collapsed
-                onChromeChange(next)
+            // 拖拽浮层：盖在任务栏最上层，跟随光标（保留按下时的抓取点）。
+            if chrome == .expanded,
+               let pid = store.draggingPID,
+               let app = store.apps.first(where: { $0.id == pid }),
+               let location = store.dragLocationInWindow {
+                DragFollowIcon(
+                    app: app,
+                    size: TaskbarStyle.iconSize(forBarHeight: barHeight),
+                    isActive: app.isActive,
+                    locationInWindow: location,
+                    grabOffsetInWindow: store.dragGrabOffsetInWindow
+                )
+                .allowsHitTesting(false)
             }
-            .frame(width: TaskbarStyle.handleWidth)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(shape.fill(Color.black))
@@ -230,41 +249,148 @@ private struct HandleButton: View {
     }
 }
 
-private struct AppIconButton: View {
+/// 拖拽中跟随光标的浮层图标（窗口坐标 → 任务栏本地坐标）。
+private struct DragFollowIcon: View {
     let app: RunningAppItem
     let size: CGFloat
-    @ObservedObject var store: RunningAppsStore
-    @ObservedObject var peekController: WindowPeekController
-    @ObservedObject private var preferences = TaskbarPreferences.shared
-    let action: () -> Void
+    let isActive: Bool
+    let locationInWindow: NSPoint
+    let grabOffsetInWindow: CGSize
 
-    @State private var hovering = false
-    @State private var anchorView: NSView?
+    @State private var probeView: NSView?
 
     private var cellWidth: CGFloat { size + TaskbarStyle.iconCellPadding }
     private var cellHeight: CGFloat { size + 4 }
 
     var body: some View {
-        ZStack {
+        GeometryReader { geo in
+            let center = iconCenter(in: geo)
+            iconContent
+                .position(x: center.x, y: center.y)
+        }
+        .background(WindowPointProbe { probeView = $0 })
+    }
+
+    private var iconContent: some View {
+        ZStack(alignment: .topTrailing) {
             VStack(spacing: 1) {
                 Image(nsImage: app.icon)
                     .resizable()
                     .interpolation(.high)
                     .frame(width: size, height: size)
                 Capsule()
-                    .fill(app.isActive ? Color.white : Color.clear)
+                    .fill(isActive ? Color.white : Color.clear)
                     .frame(width: max(8, size * 0.45), height: 2)
             }
             .frame(width: cellWidth, height: cellHeight)
             .background(
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(hoverFill)
+                    .fill(Color.white.opacity(0.28))
             )
+
+            if app.hasUnreadBadge {
+                UnreadBadgeDot(iconSize: size)
+                    .padding(.top, 1)
+                    .padding(.trailing, 1)
+            }
+        }
+        .scaleEffect(1.12)
+        .shadow(color: .black.opacity(0.55), radius: 8, y: 3)
+    }
+
+    private func iconCenter(in geo: GeometryProxy) -> CGPoint {
+        guard let probeView else {
+            return CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
+        }
+        let mouse = probeView.convert(locationInWindow, from: nil)
+        // grabOffset：鼠标相对图标中心；AppKit Y 向上，SwiftUI Y 向下。
+        let midX = mouse.x - grabOffsetInWindow.width
+        let midY = geo.size.height - (mouse.y - grabOffsetInWindow.height)
+        return CGPoint(x: midX, y: midY)
+    }
+}
+
+private struct WindowPointProbe: NSViewRepresentable {
+    let onView: (NSView) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { onView(view) }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async { onView(nsView) }
+    }
+}
+
+private struct UnreadBadgeDot: View {
+    let iconSize: CGFloat
+
+    var body: some View {
+        let side = TaskbarStyle.unreadBadgeDotSize(forIconSize: iconSize)
+        Circle()
+            .fill(Color(red: 1, green: 0.23, blue: 0.19))
+            .frame(width: side, height: side)
+            .overlay(
+                Circle()
+                    .strokeBorder(Color.black.opacity(0.25), lineWidth: 0.5)
+            )
+    }
+}
+
+private struct AppIconButton: View {
+    let app: RunningAppItem
+    let size: CGFloat
+    @ObservedObject var store: RunningAppsStore
+    @ObservedObject var peekController: WindowPeekController
+    @ObservedObject private var preferences = TaskbarPreferences.shared
+    let isDragging: Bool
+    let action: () -> Void
+
+    @State private var hovering = false
+    @State private var anchorView: NSView?
+    @State private var bounceOffset: CGFloat = 0
+    @State private var bounceTask: Task<Void, Never>?
+
+    private var cellWidth: CGFloat { size + TaskbarStyle.iconCellPadding }
+    private var cellHeight: CGFloat { size + 4 }
+
+    var body: some View {
+        ZStack {
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 1) {
+                    Image(nsImage: app.icon)
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: size, height: size)
+                    Capsule()
+                        .fill(app.isActive ? Color.white : Color.clear)
+                        .frame(width: max(8, size * 0.45), height: 2)
+                }
+                .frame(width: cellWidth, height: cellHeight)
+                .background(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(hoverFill)
+                )
+
+                if app.hasUnreadBadge && !isDragging {
+                    UnreadBadgeDot(iconSize: size)
+                        .padding(.top, 1)
+                        .padding(.trailing, 1)
+                }
+            }
+            .offset(y: isDragging ? 0 : bounceOffset)
+            // 拖拽中列表内只留淡占位，实体由图层浮层绘制。
+            .opacity(isDragging ? 0.22 : 1)
             .allowsHitTesting(false)
 
-            // 透明命中层：左键激活、右键菜单（accessory 面板上比 SwiftUI Button 可靠）。
+            // 透明命中层：左键激活 / 拖拽排序、右键菜单。
             AppIconHitView(
-                onView: { anchorView = $0 },
+                onView: { view in
+                    anchorView = view
+                    reportFrame(from: view)
+                },
                 onLeftClick: {
                     action()
                 },
@@ -275,6 +401,7 @@ private struct AppIconButton: View {
                 },
                 onHover: { isHovering in
                     hovering = isHovering
+                    if store.draggingPID != nil { return }
                     if app.isAppsLauncher {
                         if !isHovering {
                             peekController.setIconHovering(false)
@@ -293,21 +420,80 @@ private struct AppIconButton: View {
                     if isHovering {
                         presentPeekIfNeeded()
                     }
+                },
+                onDragBegan: { view, event in
+                    peekController.hide(immediate: true)
+                    reportFrame(from: view)
+                    store.beginIconDrag(pid: app.id, locationInWindow: event.locationInWindow)
+                },
+                onDragMoved: { view, event in
+                    reportFrame(from: view)
+                    store.updateIconDrag(pid: app.id, locationInWindow: event.locationInWindow)
+                },
+                onDragEnded: { _, _ in
+                    store.endIconDrag(pid: app.id)
                 }
             )
         }
         .frame(width: cellWidth, height: cellHeight)
         .help(app.localizedName)
+        .onChange(of: app.unreadBadgeSignal) { newSignal in
+            if newSignal != nil {
+                playAttentionBounce()
+            } else {
+                stopBounce()
+            }
+        }
+        .onChange(of: isDragging) { dragging in
+            if dragging {
+                stopBounce()
+            }
+        }
     }
 
     private var hoverFill: Color {
+        if isDragging { return Color.white.opacity(0.10) }
         if hovering { return Color.white.opacity(0.20) }
         if app.isActive { return Color.white.opacity(0.14) }
         return Color.clear
     }
 
+    /// 类似 Dock 提醒：向上连弹几下。
+    private func playAttentionBounce() {
+        guard !isDragging else { return }
+        bounceTask?.cancel()
+        let amplitude = min(5, max(3, size * 0.2))
+        bounceTask = Task { @MainActor in
+            bounceOffset = 0
+            for _ in 0..<3 {
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.11)) {
+                    bounceOffset = -amplitude
+                }
+                try? await Task.sleep(nanoseconds: 110_000_000)
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeIn(duration: 0.11)) {
+                    bounceOffset = 0
+                }
+                try? await Task.sleep(nanoseconds: 110_000_000)
+            }
+        }
+    }
+
+    private func stopBounce() {
+        bounceTask?.cancel()
+        bounceTask = nil
+        bounceOffset = 0
+    }
+
+    private func reportFrame(from view: NSView) {
+        let frameInWindow = view.convert(view.bounds, to: nil)
+        store.reportIconFrame(pid: app.id, frameInWindow: frameInWindow)
+    }
+
     private func presentPeekIfNeeded() {
         guard !app.isAppsLauncher,
+              store.draggingPID == nil,
               let anchorView,
               let window = anchorView.window else { return }
         let rectInWindow = anchorView.convert(anchorView.bounds, to: nil)
@@ -336,13 +522,19 @@ private struct AppIconHitView: NSViewRepresentable {
     let onRightClick: (NSView, NSEvent) -> Void
     let onHover: (Bool) -> Void
     var onLeftClickWithEvent: ((NSView, NSEvent) -> Void)? = nil
+    var onDragBegan: ((NSView, NSEvent) -> Void)? = nil
+    var onDragMoved: ((NSView, NSEvent) -> Void)? = nil
+    var onDragEnded: ((NSView, NSEvent) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             onLeftClick: onLeftClick,
             onRightClick: onRightClick,
             onHover: onHover,
-            onLeftClickWithEvent: onLeftClickWithEvent
+            onLeftClickWithEvent: onLeftClickWithEvent,
+            onDragBegan: onDragBegan,
+            onDragMoved: onDragMoved,
+            onDragEnded: onDragEnded
         )
     }
 
@@ -358,7 +550,11 @@ private struct AppIconHitView: NSViewRepresentable {
         context.coordinator.onRightClick = onRightClick
         context.coordinator.onHover = onHover
         context.coordinator.onLeftClickWithEvent = onLeftClickWithEvent
+        context.coordinator.onDragBegan = onDragBegan
+        context.coordinator.onDragMoved = onDragMoved
+        context.coordinator.onDragEnded = onDragEnded
         nsView.coordinator = context.coordinator
+        DispatchQueue.main.async { onView(nsView) }
     }
 
     final class Coordinator {
@@ -366,17 +562,26 @@ private struct AppIconHitView: NSViewRepresentable {
         var onRightClick: (NSView, NSEvent) -> Void
         var onHover: (Bool) -> Void
         var onLeftClickWithEvent: ((NSView, NSEvent) -> Void)?
+        var onDragBegan: ((NSView, NSEvent) -> Void)?
+        var onDragMoved: ((NSView, NSEvent) -> Void)?
+        var onDragEnded: ((NSView, NSEvent) -> Void)?
 
         init(
             onLeftClick: @escaping () -> Void,
             onRightClick: @escaping (NSView, NSEvent) -> Void,
             onHover: @escaping (Bool) -> Void,
-            onLeftClickWithEvent: ((NSView, NSEvent) -> Void)?
+            onLeftClickWithEvent: ((NSView, NSEvent) -> Void)?,
+            onDragBegan: ((NSView, NSEvent) -> Void)?,
+            onDragMoved: ((NSView, NSEvent) -> Void)?,
+            onDragEnded: ((NSView, NSEvent) -> Void)?
         ) {
             self.onLeftClick = onLeftClick
             self.onRightClick = onRightClick
             self.onHover = onHover
             self.onLeftClickWithEvent = onLeftClickWithEvent
+            self.onDragBegan = onDragBegan
+            self.onDragMoved = onDragMoved
+            self.onDragEnded = onDragEnded
         }
     }
 }
@@ -384,6 +589,11 @@ private struct AppIconHitView: NSViewRepresentable {
 private final class AppIconHitNSView: NSView {
     weak var coordinator: AppIconHitView.Coordinator?
     private var tracking: NSTrackingArea?
+    private var mouseDownLocationInWindow: NSPoint?
+    private var isDragging = false
+    /// 与 `NSCursor.push` 配对，避免重复 push / 漏 pop。
+    private var didPushDragCursor = false
+    private static let dragThreshold: CGFloat = 4
 
     override var isFlipped: Bool { false }
     /// 不抢第一响应者，避免任务栏点击后键盘焦点留在空白命中层。
@@ -396,7 +606,13 @@ private final class AppIconHitNSView: NSView {
         }
         let area = NSTrackingArea(
             rect: bounds,
-            options: [.activeAlways, .mouseEnteredAndExited, .inVisibleRect, .enabledDuringMouseDrag],
+            options: [
+                .activeAlways,
+                .mouseEnteredAndExited,
+                .cursorUpdate,
+                .inVisibleRect,
+                .enabledDuringMouseDrag
+            ],
             owner: self,
             userInfo: nil
         )
@@ -404,10 +620,57 @@ private final class AppIconHitNSView: NSView {
         tracking = area
     }
 
+    override func cursorUpdate(with event: NSEvent) {
+        if isDragging {
+            NSCursor.closedHand.set()
+        } else {
+            super.cursorUpdate(with: event)
+        }
+    }
+
     override func mouseDown(with event: NSEvent) {
+        // 汉堡菜单等：仍立即响应带 event 的左键。
         if let withEvent = coordinator?.onLeftClickWithEvent {
             withEvent(self, event)
-        } else {
+            return
+        }
+
+        mouseDownLocationInWindow = event.locationInWindow
+        isDragging = false
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard coordinator?.onLeftClickWithEvent == nil,
+              let start = mouseDownLocationInWindow else { return }
+
+        if !isDragging {
+            let dx = event.locationInWindow.x - start.x
+            let dy = event.locationInWindow.y - start.y
+            guard hypot(dx, dy) >= Self.dragThreshold else { return }
+            isDragging = true
+            beginDragCursor()
+            coordinator?.onDragBegan?(self, event)
+        }
+
+        if isDragging {
+            // 非激活面板上系统常改回箭头，拖拽中持续压回小手。
+            NSCursor.closedHand.set()
+            coordinator?.onDragMoved?(self, event)
+        }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        defer {
+            endDragCursor()
+            mouseDownLocationInWindow = nil
+            isDragging = false
+        }
+
+        guard coordinator?.onLeftClickWithEvent == nil else { return }
+
+        if isDragging {
+            coordinator?.onDragEnded?(self, event)
+        } else if mouseDownLocationInWindow != nil {
             coordinator?.onLeftClick()
         }
     }
@@ -425,4 +688,25 @@ private final class AppIconHitNSView: NSView {
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    /// `nonactivatingPanel` 下未激活应用时 `set()` 会被忽略；拖拽时短暂激活并 push 光标。
+    private func beginDragCursor() {
+        guard !didPushDragCursor else {
+            NSCursor.closedHand.set()
+            return
+        }
+        didPushDragCursor = true
+        if !NSApp.isActive {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        NSCursor.closedHand.push()
+    }
+
+    private func endDragCursor() {
+        guard didPushDragCursor else { return }
+        didPushDragCursor = false
+        NSCursor.pop()
+        // 与菜单弹层一致：结束后让出焦点，避免挡住其它 App 键盘输入。
+        TaskbarFocus.resignTaskbarKey()
+    }
 }

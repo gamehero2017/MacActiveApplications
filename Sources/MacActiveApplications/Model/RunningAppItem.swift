@@ -8,6 +8,10 @@ struct RunningAppItem: Identifiable, Equatable {
     let isActive: Bool
     /// 固定的 Apps / 启动板入口（非真实运行中进程）。
     let isAppsLauncher: Bool
+    /// Dock 角标非空时显示未读红点（不展示数字）。
+    let hasUnreadBadge: Bool
+    /// Dock `AXStatusLabel` 原文；变化时触发跳动（如 1→2）。
+    let unreadBadgeSignal: String?
 
     init(
         id: pid_t,
@@ -15,7 +19,9 @@ struct RunningAppItem: Identifiable, Equatable {
         localizedName: String,
         icon: NSImage,
         isActive: Bool,
-        isAppsLauncher: Bool = false
+        isAppsLauncher: Bool = false,
+        hasUnreadBadge: Bool = false,
+        unreadBadgeSignal: String? = nil
     ) {
         self.id = id
         self.bundleIdentifier = bundleIdentifier
@@ -23,5 +29,7 @@ struct RunningAppItem: Identifiable, Equatable {
         self.icon = icon
         self.isActive = isActive
         self.isAppsLauncher = isAppsLauncher
+        self.hasUnreadBadge = hasUnreadBadge
+        self.unreadBadgeSignal = unreadBadgeSignal
     }
 }

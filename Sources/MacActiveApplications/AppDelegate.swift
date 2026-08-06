@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AppWindowService.ensurePermission(prompt: true)
 
         let store = RunningAppsStore()
+        DockBadgeMonitor.shared.attach(store: store)
         let peekController = WindowPeekController()
         self.store = store
         self.peekController = peekController

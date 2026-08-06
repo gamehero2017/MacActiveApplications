@@ -15,6 +15,10 @@ enum TaskbarStyle {
     static let leadingCornerRadius: CGFloat = 10
     /// Extra width per icon cell beyond the drawn icon (highlight padding).
     static let iconCellPadding: CGFloat = 2
+    /// 未读红点相对图标尺寸的比例（再夹到合理像素范围）。
+    static let unreadBadgeDotRatio: CGFloat = 0.22
+    static let unreadBadgeDotMin: CGFloat = 5
+    static let unreadBadgeDotMax: CGFloat = 9
     /// Grow the handle toward the notch (right) beyond the visual snap base.
     static let handleTrailingExtension: CGFloat = 3
     /// Fraction of menu-bar height used to bridge AppKit safe-area vs visual notch edge.
@@ -36,6 +40,10 @@ enum TaskbarStyle {
 
     static func iconSize(forBarHeight height: CGFloat) -> CGFloat {
         max(12, height - 6)
+    }
+
+    static func unreadBadgeDotSize(forIconSize size: CGFloat) -> CGFloat {
+        min(unreadBadgeDotMax, max(unreadBadgeDotMin, size * unreadBadgeDotRatio))
     }
 
     /// 最后一个图标与把手之间的空隙（半个图标宽），减轻贴边 hover 冲突。

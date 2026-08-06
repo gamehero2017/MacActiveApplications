@@ -118,7 +118,9 @@ enum L10n {
     static var accessibilityTrusted: String { tr("menu.accessibility_trusted") }
     static var accessibilityDenied: String { tr("menu.accessibility_denied") }
     static var showApps: String { tr("menu.show_apps") }
+    static var showFinder: String { tr("menu.show_finder") }
     static var showWindowPeek: String { tr("menu.show_window_peek") }
+    static var showUnreadBadgeDot: String { tr("menu.show_unread_badge_dot") }
     static var rememberChrome: String { tr("menu.remember_chrome") }
     static var launchAtLogin: String { tr("menu.launch_at_login") }
     static var quitTaskbar: String { tr("menu.quit_taskbar") }

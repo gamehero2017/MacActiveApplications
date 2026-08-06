@@ -3,7 +3,9 @@
 "menu.accessibility_trusted" = "Accessibility: Granted";
 "menu.accessibility_denied" = "Accessibility: Not granted (click to open Settings)";
 "menu.show_apps" = "Show Apps";
+"menu.show_finder" = "Show Finder";
 "menu.show_window_peek" = "Show window list on hover";
+"menu.show_unread_badge_dot" = "Show unread badge dot";
 "menu.remember_chrome" = "Remember expanded / collapsed";
 "menu.launch_at_login" = "Launch at Login";
 "menu.quit_taskbar" = "Quit Taskbar";

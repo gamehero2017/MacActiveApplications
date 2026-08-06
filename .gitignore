@@ -3,3 +3,6 @@ dist/
 .DS_Store
 *.xcodeproj/
 .swiftpm/
+
+# Local agent handoff — keep on machine, do not push
+docs/Agent交接.md

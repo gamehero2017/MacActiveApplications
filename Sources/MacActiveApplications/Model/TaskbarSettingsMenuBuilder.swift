@@ -30,6 +30,15 @@ enum TaskbarSettingsMenuBuilder {
 
         addToggle(
             menu,
+            title: L10n.showFinder,
+            isOn: preferences.showFinder
+        ) {
+            preferences.showFinder.toggle()
+            store.refresh()
+        }
+
+        addToggle(
+            menu,
             title: L10n.showApps,
             isOn: preferences.showAppsLauncher,
             enabled: SystemAppsLauncher.appURL != nil
@@ -43,6 +52,10 @@ enum TaskbarSettingsMenuBuilder {
             if !preferences.showWindowPeekOnHover {
                 peekController.hide(immediate: true)
             }
+        }
+
+        addToggle(menu, title: L10n.showUnreadBadgeDot, isOn: preferences.showUnreadBadgeDot) {
+            preferences.showUnreadBadgeDot.toggle()
         }
 
         addToggle(menu, title: L10n.rememberChrome, isOn: preferences.rememberChromeState) {

@@ -3,7 +3,9 @@
 "menu.accessibility_trusted" = "辅助功能：已授权";
 "menu.accessibility_denied" = "辅助功能：未授权（点击打开设置）";
 "menu.show_apps" = "显示 Apps";
+"menu.show_finder" = "显示访达";
 "menu.show_window_peek" = "悬停显示窗口列表";
+"menu.show_unread_badge_dot" = "显示未读红点";
 "menu.remember_chrome" = "记住展开/收起状态";
 "menu.launch_at_login" = "开机启动";
 "menu.quit_taskbar" = "退出任务栏";
