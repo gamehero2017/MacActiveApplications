@@ -18,11 +18,13 @@ final class MenuBarPanelController: NSObject {
     private var spaceObserver: NSObjectProtocol?
     private var boundBarHeight: CGFloat?
 
-    /// 相对刘海的向左偏移；拖拽中用 live 值，结束后写入偏好。
+    /// 相对贴齐右缘的向左偏移；拖拽中用 live 值，结束后写入偏好。
     private var trailingOffset: CGFloat = 0
     private var panelDragStartScreenX: CGFloat?
     private var panelDragStartOffset: CGFloat = 0
     private var lastPresentedFlush: Bool?
+    /// 当前槽位是否允许横向收起（仅真实刘海）。
+    private var allowsSidewaysCollapse: Bool = true
 
     init(store: RunningAppsStore, peekController: WindowPeekController) {
         self.store = store
@@ -134,9 +136,9 @@ final class MenuBarPanelController: NSObject {
         panel.orderFrontRegardless()
     }
 
-    /// 贴刘海（把手贴 notch）时横向收起；拖离后改为纵向向上收起。
+    /// 有刘海且贴齐时横向收起；无刘海或已拖离则始终向上收起。
     private var isFlushToNotch: Bool {
-        trailingOffset <= TaskbarStyle.notchFlushTolerance
+        allowsSidewaysCollapse && trailingOffset <= TaskbarStyle.notchFlushTolerance
     }
 
     private func desiredWidth(in slot: MenuBarSlot) -> CGFloat {
@@ -164,6 +166,7 @@ final class MenuBarPanelController: NSObject {
     private func relayout(animated: Bool) {
         guard let slot = MenuBarGeometry.slot() else { return }
         self.slot = slot
+        allowsSidewaysCollapse = slot.allowsSidewaysCollapse
         // barHeight 未变时只改 frame，避免重置 SwiftUI hover / scroll 状态。
         if boundBarHeight != slot.barHeight {
             boundBarHeight = slot.barHeight
@@ -177,6 +180,7 @@ final class MenuBarPanelController: NSObject {
     private func relayoutFrame(animated: Bool) {
         guard let slot = MenuBarGeometry.slot() else { return }
         self.slot = slot
+        allowsSidewaysCollapse = slot.allowsSidewaysCollapse
         presentFlushIfNeeded()
         applyFrame(desiredWidth(in: slot), in: slot, animated: animated)
     }

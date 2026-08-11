@@ -367,6 +367,38 @@ final class RunningAppsStore: ObservableObject {
         scheduleRefresh()
     }
 
+    /// 通用「打开新窗口」：激活目标应用后模拟 ⌘N（与多数 App 菜单「新建窗口」一致）。
+    func openNewWindow(pid: pid_t) {
+        guard let app = runningApp(pid: pid) else { return }
+
+        // 先让出任务栏 key，确保 ⌘N 落到目标应用而不是面板。
+        TaskbarFocus.resignTaskbarKey()
+        bringToForeground(app)
+
+        let targetPID = app.processIdentifier
+        // 稍等激活完成再注入按键；未成为前台则不发送，避免误触其它应用。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            guard let front = NSWorkspace.shared.frontmostApplication,
+                  front.processIdentifier == targetPID,
+                  !front.isTerminated else { return }
+            Self.postCommandShortcut(keyCode: 45) // kVK_ANSI_N
+        }
+        scheduleRefresh()
+    }
+
+    /// 向当前前台应用注入 Command + 指定键（需辅助功能时注入才稳定）。
+    private static func postCommandShortcut(keyCode: CGKeyCode) {
+        let source = CGEventSource(stateID: .hidSystemState)
+        guard let down = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
+              let up = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) else {
+            return
+        }
+        down.flags = .maskCommand
+        up.flags = .maskCommand
+        down.post(tap: .cghidEventTap)
+        up.post(tap: .cghidEventTap)
+    }
+
     private func runningApp(pid: pid_t) -> NSRunningApplication? {
         guard pid != SystemAppsLauncher.sentinelPID,
               let app = NSRunningApplication(processIdentifier: pid),

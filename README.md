@@ -34,8 +34,8 @@
 - 宽度随运行中应用数量自适应（有上限）
 - **按住汉堡**可在可用区内水平拖动整条任务栏，松手后记住位置；**点击**汉堡仍打开设置
 - 点击把手收起 / 展开（无 hover 自动展开）；把手仅左键，无右键退出
-  - **贴齐可用区右缘**（有刘海即贴缺口）：`>` / `<`，横向收起只留右侧把手
-  - **拖离右缘后**：`∧` / `∨`，向上收成约一图标宽的顶边细条（无刘海机型的常用收纳方式）
+  - **有刘海且贴齐缺口**：`>` / `<`，横向收起只留右侧把手
+  - **无刘海，或有刘海但已拖离缺口**：`∧` / `∨`，向上收成约一图标宽的顶边细条
 - 默认图标顺序：访达 → Apps（启动板）→ 其它运行中应用（按名称）；**可拖拽排序**，松手后记住位置
 - 单击图标：切换到前台；若已是前台且有可见窗口则隐藏（Windows 任务栏语义）
 - 最小化或关窗未退出时，点击可恢复到前台（Dock 式 reopen）
@@ -45,8 +45,8 @@
   - 点击标题聚焦窗口
   - 最小化 / 最大化（可还原）/ 关闭（需辅助功能权限）
 - **右键应用图标**（不含 Apps）：
-  - 通用：显示、隐藏、在访达中显示、退出
-  - 访达额外：新建访达窗口
+  - 通用：显示、隐藏、打开新窗口（⌘N）、在访达中显示、退出
+  - 访达：新建访达窗口（替代通用 ⌘N）
 - **汉堡菜单**（最左侧，仅展开时显示；打开时图标旋转为 X）：
   - 版本信息（不可点）
   - 辅助功能状态（打开系统设置；系统授权框最多自动弹一次）
@@ -96,21 +96,45 @@ open Package.swift
 ./scripts/package-dmg.sh
 ```
 
-默认打出 **Universal**（`arm64` + `x86_64`）一份 `.app` / DMG，Apple Silicon 与 Intel 都可安装。也可只打单架构：
+默认分别打出两份安装包（Apple Silicon / Intel）：
+
+- `dist/MacActiveApplications-<版本号>-arm.dmg`
+- `dist/MacActiveApplications-<版本号>-amd64.dmg`
+
+也可只打其中一种：
 
 ```bash
-ARCHS=arm64 ./scripts/package-dmg.sh    # 仅 Apple Silicon
-ARCHS=x86_64 ./scripts/package-dmg.sh   # 仅 Intel
+ARCHS=arm ./scripts/package-dmg.sh      # 仅 Apple Silicon → *-arm.dmg
+ARCHS=amd64 ./scripts/package-dmg.sh    # 仅 Intel → *-amd64.dmg
 ```
 
-在 Apple Silicon 上编 `x86_64` 需已安装 Rosetta（系统会按需提示）。可用 `lipo -archs dist/MacActiveApplications.app/Contents/MacOS/MacActiveApplications` 确认架构。
+### 代码签名（避免每次重装都重授辅助功能）
 
-产物：
+默认仍是 **ad-hoc**（`codesign --sign -`），每次重打包签名会变，系统会要求重新勾选辅助功能。
 
-- `dist/MacActiveApplications.app`
-- `dist/MacActiveApplications-<版本号>.dmg`（版本取自 `Resources/Info.plist` 的 `CFBundleShortVersionString`）
+本机有 Apple 开发者证书时，用稳定身份签名：
 
-安装：打开 DMG，将 App 拖入「应用程序」。首次使用请在：
+```bash
+# 查看可用身份
+security find-identity -v -p codesigning
+
+# 自动选用钥匙串中的 Developer ID / Apple Development
+CODESIGN_IDENTITY=auto ./scripts/package-dmg.sh
+
+# 或显式指定
+CODESIGN_IDENTITY="Apple Development: Your Name (TEAMID)" ./scripts/package-dmg.sh
+```
+
+同一证书连续更新安装后，辅助功能勾选通常会保留。证书需在 Xcode → Settings → Accounts 中登录 Apple ID 并下载。对外分发请用 Developer ID 并完成公证。
+
+在 Apple Silicon 上编 `amd64`（x86_64）需已安装 Rosetta（系统会按需提示）。可用 `lipo -archs dist/MacActiveApplications-arm.app/Contents/MacOS/MacActiveApplications` 确认架构。
+
+产物示例：
+
+- `dist/MacActiveApplications-arm.app` / `dist/MacActiveApplications-amd64.app`
+- 对应版本的 `-arm.dmg` / `-amd64.dmg`（版本取自 `Resources/Info.plist` 的 `CFBundleShortVersionString`）
+
+安装：打开对应架构的 DMG，将 App 拖入「应用程序」。首次使用请在：
 
 **系统设置 → 隐私与安全性 → 辅助功能**
 
@@ -194,7 +218,7 @@ docs/
 - 最大化几何在极端多屏布局下可能需再校准
 - Apps 入口依赖系统 Dock 接口；极端系统版本差异下行为可能需再验证
 - 未读红点依赖 Dock 中对应图标的角标；移出 Dock 或未授权辅助功能时无法显示
-- 当前为本地工具打包（ad-hoc 签名）；对外分发建议 Developer ID + 公证
+- 本地打包默认 ad-hoc 签名（每次重装可能需重授辅助功能）；可用 `CODESIGN_IDENTITY=auto` 稳定签名；对外分发建议 Developer ID + 公证
 
 ## 相关文档
 

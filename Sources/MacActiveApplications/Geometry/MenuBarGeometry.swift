@@ -3,8 +3,10 @@ import AppKit
 struct MenuBarSlot: Equatable {
     /// Full usable strip left of the notch (or fallback virtual slot).
     let availableFrame: NSRect
-    /// Right edge X flush with the notch black area.
+    /// Right edge X flush with the notch black area (or no-notch slot trailing edge).
     let snapMaxX: CGFloat
+    /// 仅真实刘海屏支持「贴齐后横向收起」；无刘海屏始终向上收起。
+    let allowsSidewaysCollapse: Bool
     var barHeight: CGFloat { availableFrame.height }
     var screen: NSScreen?
 }
@@ -29,19 +31,36 @@ enum MenuBarGeometry {
 
         if let left = screen.auxiliaryTopLeftArea, left.width > 1, left.height > 1 {
             let snapMaxX = notchSnapMaxX(leftArea: left, screen: screen)
-            return MenuBarSlot(availableFrame: left, snapMaxX: snapMaxX, screen: screen)
+            return MenuBarSlot(
+                availableFrame: left,
+                snapMaxX: snapMaxX,
+                allowsSidewaysCollapse: true,
+                screen: screen
+            )
         }
 
-        // No-notch fallback: virtual slot occupying the left ~42% of the menu bar.
+        // 无刘海：可用区覆盖菜单栏大部分，仅预留右侧系统状态区；可拖过屏幕中线。
         let menuHeight = max(24, screen.frame.maxY - screen.visibleFrame.maxY)
-        let slotWidth = screen.frame.width * 0.42
+        let reservedTrailing = max(
+            screen.frame.width * TaskbarStyle.noNotchTrailingReserveRatio,
+            TaskbarStyle.noNotchTrailingReserveMin
+        )
+        let slotWidth = max(
+            TaskbarStyle.collapsedWidth * 4,
+            screen.frame.width - reservedTrailing
+        )
         let frame = NSRect(
             x: screen.frame.minX,
             y: screen.frame.maxY - menuHeight,
             width: slotWidth,
             height: menuHeight
         )
-        return MenuBarSlot(availableFrame: frame, snapMaxX: frame.maxX, screen: screen)
+        return MenuBarSlot(
+            availableFrame: frame,
+            snapMaxX: frame.maxX,
+            allowsSidewaysCollapse: false,
+            screen: screen
+        )
     }
 
     /// Panel frame: trailing edge inset from notch snap by `trailingOffset` (0 = flush).

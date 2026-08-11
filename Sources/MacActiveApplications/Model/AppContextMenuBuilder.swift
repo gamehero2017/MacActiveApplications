@@ -20,10 +20,15 @@ enum AppContextMenuBuilder {
             store.hideApp(pid: app.id)
         }
 
+        menu.addItem(.separator())
         if app.bundleIdentifier == RunningAppsStore.finderBundleID {
-            menu.addItem(.separator())
+            // 访达用 AppleScript 更稳；其它应用走通用 ⌘N。
             addItem(menu, title: L10n.newFinderWindow) {
                 store.newFinderWindow()
+            }
+        } else {
+            addItem(menu, title: L10n.openNewWindow) {
+                store.openNewWindow(pid: app.id)
             }
         }
 

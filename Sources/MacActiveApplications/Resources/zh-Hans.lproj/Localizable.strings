@@ -19,6 +19,7 @@
 "context.show" = "显示";
 "context.hide" = "隐藏";
 "context.new_finder_window" = "新建访达窗口";
+"context.open_new_window" = "打开新窗口";
 "context.reveal_in_finder" = "在访达中显示";
 "context.quit" = "退出";
 

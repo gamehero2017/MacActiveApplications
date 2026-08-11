@@ -34,8 +34,8 @@ Hover window list:
 - Width scales with the number of running apps (with a maximum)
 - **Drag the hamburger** horizontally within the usable strip to reposition the bar (persisted); **click** still opens settings
 - Handle click collapses / expands (no auto-expand on hover)
-  - **Flush with the strip’s right edge** (the notch when present): `>` / `<`, collapse sideways to the right-side handle
-  - **Detached from that edge**: `∧` / `∨`, collapse upward into a thin top strip about one icon wide (typical on non-notch displays)
+  - **Notched and flush with the notch**: `>` / `<`, collapse sideways to the right-side handle
+  - **No notch, or notched but dragged away**: `∧` / `∨`, collapse upward into a thin top strip about one icon wide
 - Default icon order: Finder → Apps (Launchpad) → other running apps (by name); **drag to reorder**, order is remembered
 - Single-click icon: bring to front; if already frontmost with visible windows, hide (Windows taskbar semantics)
 - Minimized or window-closed-but-still-running apps can be restored on click (Dock-like reopen)
@@ -45,8 +45,8 @@ Hover window list:
   - Click a title to focus the window
   - Minimize / maximize (restorable) / close (requires Accessibility)
 - **Right-click app icons** (except Apps):
-  - Common: Show, Hide, Reveal in Finder, Quit
-  - Finder extra: New Finder Window
+  - Common: Show, Hide, Open New Window (⌘N), Reveal in Finder, Quit
+  - Finder: New Finder Window (instead of generic ⌘N)
 - **Hamburger menu** (leftmost, expanded only; icon rotates to an X while open):
   - Version (non-interactive)
   - Accessibility status (opens System Settings; system prompt at most once)
@@ -96,21 +96,41 @@ This tool has no Dock icon. You can:
 ./scripts/package-dmg.sh
 ```
 
-By default this builds a **Universal** app (`arm64` + `x86_64`) in one DMG. Single-arch builds:
+By default this builds **two** installers:
+
+- `dist/MacActiveApplications-<version>-arm.dmg` (Apple Silicon)
+- `dist/MacActiveApplications-<version>-amd64.dmg` (Intel)
+
+Single-arch builds:
 
 ```bash
-ARCHS=arm64 ./scripts/package-dmg.sh
-ARCHS=x86_64 ./scripts/package-dmg.sh
+ARCHS=arm ./scripts/package-dmg.sh
+ARCHS=amd64 ./scripts/package-dmg.sh
 ```
 
-Building `x86_64` on Apple Silicon requires Rosetta. Verify with `lipo -archs dist/MacActiveApplications.app/Contents/MacOS/MacActiveApplications`.
+### Code signing (keep Accessibility across updates)
+
+Default is **ad-hoc** signing; each rebuild usually requires re-checking Accessibility.
+
+With a developer certificate in your keychain:
+
+```bash
+security find-identity -v -p codesigning
+CODESIGN_IDENTITY=auto ./scripts/package-dmg.sh
+# or:
+CODESIGN_IDENTITY="Apple Development: Your Name (TEAMID)" ./scripts/package-dmg.sh
+```
+
+Download certificates via Xcode → Settings → Accounts. For public distribution use Developer ID + notarization.
+
+Building `amd64` (x86_64) on Apple Silicon requires Rosetta. Verify with `lipo -archs dist/MacActiveApplications-arm.app/Contents/MacOS/MacActiveApplications`.
 
 Outputs:
 
-- `dist/MacActiveApplications.app`
-- `dist/MacActiveApplications-<version>.dmg` (version from `CFBundleShortVersionString` in `Resources/Info.plist`)
+- `dist/MacActiveApplications-arm.app` / `dist/MacActiveApplications-amd64.app`
+- Matching `-arm.dmg` / `-amd64.dmg` (version from `CFBundleShortVersionString` in `Resources/Info.plist`)
 
-Install: open the DMG and drag the app to Applications. On first launch, enable it under:
+Install: open the DMG for your architecture and drag the app to Applications. On first launch, enable it under:
 
 **System Settings → Privacy & Security → Accessibility**
 
@@ -192,7 +212,7 @@ Without Accessibility, the taskbar itself still works; window title-bar actions 
 - Maximize geometry may need recalibration on unusual multi-monitor layouts
 - Apps entry depends on Dock interfaces; behavior may vary on extreme OS versions
 - Unread dots require the app’s Dock tile badge and Accessibility; apps removed from the Dock won’t show dots
-- Local packaging uses ad-hoc signing; public distribution should use Developer ID + notarization
+- Local packaging defaults to ad-hoc signing (Accessibility may reset each rebuild); use `CODESIGN_IDENTITY=auto` for stable signing; public distribution should use Developer ID + notarization
 
 ## Related docs
 

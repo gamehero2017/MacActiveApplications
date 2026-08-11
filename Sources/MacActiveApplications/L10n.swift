@@ -134,6 +134,7 @@ enum L10n {
     static var show: String { tr("context.show") }
     static var hide: String { tr("context.hide") }
     static var newFinderWindow: String { tr("context.new_finder_window") }
+    static var openNewWindow: String { tr("context.open_new_window") }
     static var revealInFinder: String { tr("context.reveal_in_finder") }
     static var quit: String { tr("context.quit") }
 

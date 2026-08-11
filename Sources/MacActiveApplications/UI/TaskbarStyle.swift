@@ -11,6 +11,9 @@ enum TaskbarStyle {
     static let collapsedStripHeight: CGFloat = 16
     /// 判定「贴刘海」的 trailingOffset 容差（pt）。
     static let notchFlushTolerance: CGFloat = 1.5
+    /// 无刘海屏：右侧为系统状态项预留的比例 / 最小宽度（pt）。
+    static let noNotchTrailingReserveRatio: CGFloat = 0.16
+    static let noNotchTrailingReserveMin: CGFloat = 140
     static let horizontalPadding: CGFloat = 4
     static let iconSpacing: CGFloat = 2
     /// Keep a little air on the leading edge so the rounded corner doesn't clip system menus.

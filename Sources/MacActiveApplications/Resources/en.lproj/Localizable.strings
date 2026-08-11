@@ -19,6 +19,7 @@
 "context.show" = "Show";
 "context.hide" = "Hide";
 "context.new_finder_window" = "New Finder Window";
+"context.open_new_window" = "Open New Window";
 "context.reveal_in_finder" = "Reveal in Finder";
 "context.quit" = "Quit";
 
