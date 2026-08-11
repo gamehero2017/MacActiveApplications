@@ -90,50 +90,6 @@ This tool has no Dock icon. You can:
 - If started with `swift run` in a terminal: `Ctrl + C`
 - Or: `killall MacActiveApplications`
 
-## Package a DMG
-
-```bash
-./scripts/package-dmg.sh
-```
-
-By default this builds **two** installers:
-
-- `dist/MacActiveApplications-<version>-arm.dmg` (Apple Silicon)
-- `dist/MacActiveApplications-<version>-amd64.dmg` (Intel)
-
-Single-arch builds:
-
-```bash
-ARCHS=arm ./scripts/package-dmg.sh
-ARCHS=amd64 ./scripts/package-dmg.sh
-```
-
-### Code signing (keep Accessibility across updates)
-
-Default is **ad-hoc** signing; each rebuild usually requires re-checking Accessibility.
-
-With a developer certificate in your keychain:
-
-```bash
-security find-identity -v -p codesigning
-CODESIGN_IDENTITY=auto ./scripts/package-dmg.sh
-# or:
-CODESIGN_IDENTITY="Apple Development: Your Name (TEAMID)" ./scripts/package-dmg.sh
-```
-
-Download certificates via Xcode → Settings → Accounts. For public distribution use Developer ID + notarization.
-
-Building `amd64` (x86_64) on Apple Silicon requires Rosetta. Verify with `lipo -archs dist/MacActiveApplications-arm.app/Contents/MacOS/MacActiveApplications`.
-
-Outputs:
-
-- `dist/MacActiveApplications-arm.app` / `dist/MacActiveApplications-amd64.app`
-- Matching `-arm.dmg` / `-amd64.dmg` (version from `CFBundleShortVersionString` in `Resources/Info.plist`)
-
-Install: open the DMG for your architecture and drag the app to Applications. On first launch, enable it under:
-
-**System Settings → Privacy & Security → Accessibility**
-
 ## Project layout
 
 ```text
@@ -161,10 +117,8 @@ Sources/MacActiveApplications/
     TaskbarStyle.swift              # Size & style constants
 Resources/
   Info.plist
-  AppIcon.icns                      # Packaging icon
+  AppIcon.icns
   AppIcon.icon/                     # Icon Composer source (optional)
-scripts/
-  package-dmg.sh                    # Release build → .app → DMG
 docs/
   更新说明.md                       # Changelog (Chinese)
 ```
@@ -212,7 +166,6 @@ Without Accessibility, the taskbar itself still works; window title-bar actions 
 - Maximize geometry may need recalibration on unusual multi-monitor layouts
 - Apps entry depends on Dock interfaces; behavior may vary on extreme OS versions
 - Unread dots require the app’s Dock tile badge and Accessibility; apps removed from the Dock won’t show dots
-- Local packaging defaults to ad-hoc signing (Accessibility may reset each rebuild); use `CODESIGN_IDENTITY=auto` for stable signing; public distribution should use Developer ID + notarization
 
 ## Related docs
 

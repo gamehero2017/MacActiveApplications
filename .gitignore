@@ -12,3 +12,7 @@ docs/软著鉴别材料/
 .venv-softcopyright/
 scripts/generate-soft-copyright-docs.py
 scripts/generate-soft-copyright-source.py
+
+# Packaging (local only — do not push)
+scripts/package-dmg.sh
+*.dmg

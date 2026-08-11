@@ -90,56 +90,6 @@ open Package.swift
 - 终端 `swift run` 时：`Ctrl + C`
 - 或：`killall MacActiveApplications`
 
-## 打包 DMG
-
-```bash
-./scripts/package-dmg.sh
-```
-
-默认分别打出两份安装包（Apple Silicon / Intel）：
-
-- `dist/MacActiveApplications-<版本号>-arm.dmg`
-- `dist/MacActiveApplications-<版本号>-amd64.dmg`
-
-也可只打其中一种：
-
-```bash
-ARCHS=arm ./scripts/package-dmg.sh      # 仅 Apple Silicon → *-arm.dmg
-ARCHS=amd64 ./scripts/package-dmg.sh    # 仅 Intel → *-amd64.dmg
-```
-
-### 代码签名（避免每次重装都重授辅助功能）
-
-默认仍是 **ad-hoc**（`codesign --sign -`），每次重打包签名会变，系统会要求重新勾选辅助功能。
-
-本机有 Apple 开发者证书时，用稳定身份签名：
-
-```bash
-# 查看可用身份
-security find-identity -v -p codesigning
-
-# 自动选用钥匙串中的 Developer ID / Apple Development
-CODESIGN_IDENTITY=auto ./scripts/package-dmg.sh
-
-# 或显式指定
-CODESIGN_IDENTITY="Apple Development: Your Name (TEAMID)" ./scripts/package-dmg.sh
-```
-
-同一证书连续更新安装后，辅助功能勾选通常会保留。证书需在 Xcode → Settings → Accounts 中登录 Apple ID 并下载。对外分发请用 Developer ID 并完成公证。
-
-在 Apple Silicon 上编 `amd64`（x86_64）需已安装 Rosetta（系统会按需提示）。可用 `lipo -archs dist/MacActiveApplications-arm.app/Contents/MacOS/MacActiveApplications` 确认架构。
-
-产物示例：
-
-- `dist/MacActiveApplications-arm.app` / `dist/MacActiveApplications-amd64.app`
-- 对应版本的 `-arm.dmg` / `-amd64.dmg`（版本取自 `Resources/Info.plist` 的 `CFBundleShortVersionString`）
-
-安装：打开对应架构的 DMG，将 App 拖入「应用程序」。首次使用请在：
-
-**系统设置 → 隐私与安全性 → 辅助功能**
-
-中勾选本应用。
-
 ## 项目结构
 
 ```text
@@ -167,10 +117,8 @@ Sources/MacActiveApplications/
     TaskbarStyle.swift              # 尺寸与样式常量
 Resources/
   Info.plist
-  AppIcon.icns                      # 打包用图标
+  AppIcon.icns
   AppIcon.icon/                     # Icon Composer 源（可选）
-scripts/
-  package-dmg.sh                    # Release 编译 → .app → DMG
 docs/
   更新说明.md                       # 版本更新说明
 ```
@@ -218,7 +166,6 @@ docs/
 - 最大化几何在极端多屏布局下可能需再校准
 - Apps 入口依赖系统 Dock 接口；极端系统版本差异下行为可能需再验证
 - 未读红点依赖 Dock 中对应图标的角标；移出 Dock 或未授权辅助功能时无法显示
-- 本地打包默认 ad-hoc 签名（每次重装可能需重授辅助功能）；可用 `CODESIGN_IDENTITY=auto` 稳定签名；对外分发建议 Developer ID + 公证
 
 ## 相关文档
 
